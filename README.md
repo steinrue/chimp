@@ -1,4 +1,4 @@
-# CHMM_Inferencing
+# CHMM Inference
 
 Here we implement CHIMP, a method that infers demographic history from whole genome sequencing data. Background on the method and its theoretical models can be found [here](www.<<LinkToPaper>>.com).
 
