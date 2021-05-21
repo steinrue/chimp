@@ -20,3 +20,4 @@ lib/*.jar
 *.tar.gz
 *.rar
 
+.DS_Store

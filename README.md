@@ -1,47 +1,51 @@
 # CHMM Inference
 
-Here we implement CHIMP, a method that infers demographic history from whole genome sequencing data. Background on the method and its theoretical models can be found [here](www.<<LinkToPaper>>.com).
+Here we provide an implementation of CHIMP in `java`, a method that infers the population size history of a population from whole genome sequencing data. Background on the method and its theoretical models can be found in this [manuscript](www.<<LinkToPaper>>.com).
 
-This method can be run with the Chimp.jar file provided in this repository (it already contains all relevant libraries). 
+The method can be run with the `Chimp.jar` file provided for download in this repository (the relevant libraries are packaged into this jar-file). 
+
+The subdirectory `Simulation_Studies` contains `python` scripts that were used to conduct the simulation studies in the [manuscript](www.<<LinkToPaper>>.com).
 
 
 # Input and Output
 
 In order to run CHIMP, you need to make sure you have three things for your data:
--  .vcf files containing data for SNPs (non-SNPs are filtered out by Chimp, and unlisted positions are assumed non-segregating)
--  .fasta files with the reference alleles ('N' for missing sites)
--  .fasta files with the ancestral alleles (if you do not have this, the reference files can be used here, though the inference may be affected)
+-  .vcf files containing data for SNPs. Non-bialellic SNPs (e.g. tri-allellic, structural variation, ...) are filtered out by Chimp.
+-  .fasta files for the reference sequence. This specifies the alleles at the sites that are not listed in the .vcf ('N' for missing sites).
+-  .fasta files for the ancestral sequence. If you do not have this, the reference files can be used here, though the inference may be affected.
 
-CHIMP will analyze the VCFs provided, selecting a specified number of haplotypes from left to right (it will treat diploid individual data as two separate haplotypes) and ignoring additional haplotypes if the file contains more than specified. If this method for selecting the haplotypes might cause bias for your data, we recommend randomly permuting the haplotypes before running CHIMP. 
+CHIMP will analyze the VCFs provided, selecting a specified number of haplotypes from left to right (it will treat diploid individual data as two separate haplotypes) and ignoring additional haplotypes if the file contains more than specified. If this method for selecting the haplotypes might cause bias for your data, we recommend reordering (e.g. randomly permuting) the haplotypes before running CHIMP. 
 
-Any variant listed in the VCF that is not a biallelic SNP for the samples to be analyzed will be treated as a missing site, and positions not listed in the VCF are treated as non-segregating. The reference FASTA file is used to specify tracts of missing data, and the ancestral FASTA file helps distinguish ancestral from derived alleles. 
+Any variant listed in the VCF that is not a biallelic SNP for the samples to be analyzed (e.g. tri-allellic, structural variation, ...) will be treated as a missing site, and positions not listed in the VCF are treated as non-segregating. The reference FASTA file is used to specify tracts of missing data, and the ancestral FASTA file helps distinguish ancestral from derived alleles. 
 
-CHIMP will infer a piece-wise continuous population size history with 20 epochs. The boundaries between these epochs are distributed exponentially (uniformly on a log scale) between Ne/50 and 5*Ne. Ne is the effective population size computed from Waterson's Estimator across the data, and is also the value at which the population size in each epoch is initialized.
+CHIMP will infer a piece-wise constant population size history with 20 epochs. The boundaries between these epochs are distributed exponentially (uniformly on a log scale) between Ne/50 and 5*Ne. Ne is the effective population size computed from Waterson's Estimator across the data, and is also the value at which the population size in each epoch is initialized.
 
-Upon completion, CHIMP will output two files. The PARAM file contains the results of the inference, listed as a single ordered pair for each epoch of history. Each ordered pair contains [epoch's lower bound in generations, population size during epoch]. All times are given in generations from present, and population sizes are given in number of diploid individuals. The CSV file contains a dense set of ordered pairs (with many pairs for each epoch) that can be used for plotting. 
+Upon completion, CHIMP will output two files. The PARAM file contains the results of the inference, listed as a single ordered pair for each epoch of the history. Each ordered pair contains [epoch's lower bound in generations, population size during epoch]. All times are given in generations before present, and population sizes are given in number of diploid individuals. The CSV file contains a dense set of ordered pairs (with many pairs for each epoch) that can be used for plotting. 
 
 # Necessary Parameters and a Minimal Example
 
-When running CHIMP, the following options are necessary. 
+When running CHIMP, the following options are necessary.By default, CHIMP will use the TMRCA as the hidden state.
 ```
 --rec_rate <recombination_rate>
-        Recombination rate, specified per generation per nucleotide (recommend
+        Recombination rate, specified per generation per nucleotide (e.g.
         .0000000125 for human data).
 
 --mut_rate <mutation_rate>
         Mutation rate along a lineage, specified per generation per nucleotide
-        (recommend .0000000125 for human data).
+        (e.g. .0000000125 for human data).
         
 --base_n <base_n_samples>
         Number of haplotypes considered in each parallel CHMM model (The total
         number of haplotypes analyzed is <base_n> * <n_groups> under our
-        composite likelihood scheme). We recommend at most choosing --base_n=10
-        (though for TMRCA the method is still tractable up to 30) and adjusting
-        <n_groups> accordingly to tackle larger sample sizes.
+        composite likelihood scheme, default for <n_groups> is 1). We
+        recommend at most choosing --base_n=10 (though for TMRCA the method is
+        still tractable up to 30) and adjusting <n_groups> accordingly to tackle
+        larger sample sizes.
         
 --vcf_list [vcf_1,vcf_2,...,vcf_N]
 	List of VCF files for each chromosome to perform inference on. Will
-        analyze the first (<base_n> * <n_groups>) haplotypes in each file.
+        analyze the first (<base_n> * <n_groups>, default for <n_groups> is
+        one) haplotypes in each file.
         
 --ref_list [ref_1,ref_2,...,ref_N] 
         List of reference files for each chromosome. Indexing and length of list
@@ -56,13 +60,15 @@ When running CHIMP, the following options are necessary.
         Prefix for output files CHIMP will produce with the inference results.
         CSV contains ordered pairs of [time, population size], and PARAM file
         contains, for each epoch, [epoch's lower bound (time), inferred
-        population size]. Times are given in generations from present, and
+        population size]. Times are given in generations before present, and
         population sizes are in number of diploid individuals.
 ```
 
 Thus, a minimal command line example is:
 ```
-java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10
+java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta
+      --anc_list=anc1.fasta --out_file=results --rec_rate=.0000000125
+      --mut_rate=.0000000125 --base_n=10
 ```
 This will output the files results.csv and results.param which contain the inferred population size histories. The inference is performed using the default parameters for the model. 
 
@@ -86,11 +92,12 @@ Further customization of the model and the inference procedure can be achieved w
 
 --dof <degrees_of_freedom>
         Number of epochs of population size history between [t_bounds] (with 2
-        additional epochs added at boundaries). One parameter is inferred for
-        each epoch during EM. Note that dof=X will yield X+2 epochs. (default: 18)
+        additional epochs added, one above and one below [t_bounds]). One
+        parameter is inferred for each epoch during EM. Note that dof=X will
+        yield X+2 epochs. (default: 18)
         
 --psh0 <initial_size_guess>
-        Initial guess for population size. Default is to use Waterson's estimate
+        Initial guess for population size. Default is to use Waterson's estimator
         for N_effective, computed from data (and based on the specified mutation
         rate). Specifying this option will also use <psh0> instead of Waterson's
         estimate in computing default for [t_bounds] and the partitioning CHMM
@@ -112,9 +119,9 @@ Further customization of the model and the inference procedure can be achieved w
         (default: 50)
 
 --metalocus_size <metalocus_size>
-        Number of bases grouped into each metalocus. Selecting metalocus_size=1
-        will activate a locus skipping algorithm to aid computational
-        efficiency. (default: 500)
+        Number of bases grouped into each metalocus to speed up computations of
+        the E-Step. Selecting metalocus_size=1 will activate a locus skipping
+        algorithm to aid computational efficiency. (default: 500)
 
 --em_cap <max_em_steps>
         Maximum number of EM steps performed. Inference will end sooner if the
@@ -137,40 +144,48 @@ Further customization of the model and the inference procedure can be achieved w
         height (TMRCA) as representation of the CHMMs hidden state.
         
 --output_steps
-	This option will produce new output files after each EM step, titled
+	      This option will produce new output files after each EM step, titled
         "EMstep_X" where X is the EM step number. The files will be placed in a
         new folder entitled <out_file>.
         
 --pseudo
-	Use this switch to specify that the data is pseudohaploid data. CHIMP 
-	will assume each allele for each variant in the VCF is randomly selected 
-	from either haploid of a diploid individual (independently for each 
-	variant/individual). Emission probabilities will be adjusted accordingly.
+	      Use this switch to specify that the data is pseudohaploid data. CHIMP 
+	      will assume each allele for each variant in the VCF is randomly selected 
+	      from either haploid of a diploid individual (independently for each 
+	      variant/individual). Emission probabilities will be adjusted accordingly.
 	
 ```
 
 We now show some usage examples using these options. 
 
  ```
-java -jar Chimp.jar --vcf_list=chrom1.vcf,chrom2.vcf --ref_list=ref1.fasta,ref2.fasta --anc_list=anc1.fasta,anc2.fasta --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10 --n_groups=15 --tree_length
+java -jar Chimp.jar --vcf_list=chrom1.vcf,chrom2.vcf --ref_list=ref1.fasta,ref2.fasta
+        --anc_list=anc1.fasta,anc2.fasta --out_file=results --rec_rate=.0000000125
+        --mut_rate=.0000000125 --base_n=10 --n_groups=15 --tree_length
 ```
 
 The above example analyzes two chromosomes together (chrom1, chrom2), analyzes 150 haplotypes (in 15 groups of 10), and uses total branch length (L) instead of TMRCA as the hidden state.
 
  ```
-java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10 --n_groups=20 --t_bounds=500,4000 --dof=3
+java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta
+        --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10
+        --n_groups=20 --t_bounds=500,4000 --dof=3
 ```
 
 The above example analyzes a single chromosome using 200 haplotypes and the TMRCA model for the CHMM. The population size history has 5 epochs partitioned by the times [500,1000,2000,4000]. Note that this is achieved by specifying 3 degrees of freedom (that will be exponentially spaced) between the bounds 500 and 4000. Alternatively we could have specified `--psh0_xs=500,1000,2000,4000` instead of `t_bounds` and `dof` to achieve the same result. 
 
  ```
-java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10 --psh0_xs=1000,2000,3000 --psh0_ys=40000,20000,10000,5000 --ouput_steps
+java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta
+        --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10
+        --psh0_xs=1000,2000,3000 --psh0_ys=40000,20000,10000,5000 --ouput_steps
 ```
-In the above example (for 10 haplotypes) we have not only customized the epoch partitions (to be [1000,2000,3000] which would have been unachievable with  `t_bounds` and `dof` due to the non-exponential sequence), but we have also specified a prior guess of population sizes (40k,20k,10k,5k) in the epochs. This population history is where the EM will be initialized, instead of assuming a size of N_e in each epoch (computed from Waterson's estimate). The final option will also cause the method to output the intermediate population size histories as well after each EM step. This can be useful for analyzing convergence behavior or overfitting behavior of the method.
+In the above example (for 10 haplotypes) we have not only customized the epoch partitions (to be [1000,2000,3000] which would have been unachievable with `t_bounds` and `dof` due to the non-exponential sequence), but we have also specified a prior guess of population sizes (40k,20k,10k,5k) in the epochs. This population history is where the EM will be initialized, instead of assuming a size of N_e in each epoch (computed from Waterson's estimate). The final option will also cause the method to output the intermediate population size histories as well after each EM step. This can be useful for analyzing convergence behavior or overfitting behavior of the method.
 
 
  ```
-java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10 --n_states=25 --metalocus_size=1000 --em_cap=20 --m_evals=35 --ll_converge=.5
+java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta
+        --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10
+        --n_states=25 --metalocus_size=1000 --em_cap=20 --m_evals=35 --ll_converge=.5
 ```
 
 In the above example, we have shown the usage of several options that will make CHIMP complete the inference faster, though with less accuracy. By reducing the number of `n_states` we move further away from the SMC (the "true" model), but gain speed for the E-step. Similarly by increasing `metalocus_size` we are assuming that larger segments of the genome are described by the same tree, increasing E-step speed but reducing accuracy of the model. We have also reduced the number of EM steps, the probability matrix computations per M-step, and widened the convergence threshold -- all of which will cause CHIMP to finish quicker, but possibly before it can near the true likelihood maximum. 
@@ -257,31 +272,6 @@ The following options have not been extensively tested and we recommend caution 
         This will distribute the epoch partitions uniformly on a linear scale
         rather than on a log scale.
 ```
-
-WANT TO COMPLETELY HIDE FOLLOWING PARAMETERS. 
-
-```        
---data_dir <data_file_directory>
-        Directory where data files are stored (include trailing "/"). Prepends
-        this to all input files.
-        
---s_type <simplex_type>
-        ID for simplex type that EM_HMM uses at each em step. Default
-        corresponds to an equilateral simplex centered on the current value,
-        adjusted to include current value if it is better than the worst vertex.
-        (default: 0)
-        
---sfs
-        Use this switch to specify use of Site Frequency Spectrum (will not use
-        linkage info). Computes marginal from TMRCA transition probability
-        matrix. This is a highly inefficient implementation of SFS based
-        demographic inference.
-
---binary_emission
-        Use this switch to specify model with only 2 emission possibilities,
-        segregating or non-segregating.
-```
-
 
 In implementing this project, we have used the following publicly available libraries:
 - [HTSJDK - VCF tool] (https://github.com/samtools/htsjdk)
