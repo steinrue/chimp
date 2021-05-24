@@ -1,10 +1,10 @@
 # CHMM Inference
 
-Here we provide an implementation of CHIMP in `java`, a method that infers the population size history of a population from whole genome sequencing data. Background on the method and its theoretical models can be found in this [manuscript](www.<<LinkToPaper>>.com).
+Here we provide an implementation of CHIMP in `java`, a method that infers the population size history of a population from whole genome sequencing data. Background on the method and its theoretical models can be found in this [manuscript](https://doi.org/10.1101/2021.05.22.445274).
 
 The method can be run with the `Chimp.jar` file provided for download in this repository (the relevant libraries are packaged into this jar-file). 
 
-The subdirectory `Simulation_Studies` contains `python` scripts that were used to conduct the simulation studies in the [manuscript](www.<<LinkToPaper>>.com).
+The subdirectory `Simulation_Studies` contains `python` scripts that were used to conduct the simulation studies in the [manuscript](https://doi.org/10.1101/2021.05.22.445274).
 
 
 # Input and Output
