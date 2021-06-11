@@ -169,15 +169,15 @@ The above example analyzes two chromosomes together (chrom1, chrom2), analyzes 1
  ```
 java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta
         --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10
-        --n_groups=20 --t_bounds=500,4000 --dof=3
+        --n_groups=20 --t_bounds=500,4000 --dof=3 --pseudo
 ```
 
-The above example analyzes a single chromosome using 200 haplotypes and the TMRCA model for the CHMM. The population size history has 5 epochs partitioned by the times [500,1000,2000,4000]. Note that this is achieved by specifying 3 degrees of freedom (that will be exponentially spaced) between the bounds 500 and 4000. Alternatively we could have specified `--psh0_xs=500,1000,2000,4000` instead of `t_bounds` and `dof` to achieve the same result. 
+The above example analyzes a single chromosome using 200 haplotypes and the TMRCA model for the CHMM. The population size history has 5 epochs partitioned by the times [500,1000,2000,4000]. Note that this is achieved by specifying 3 degrees of freedom (that will be exponentially spaced) between the bounds 500 and 4000. Alternatively we could have specified `--psh0_xs=500,1000,2000,4000` instead of `t_bounds` and `dof` to achieve the same result. The pseudo flag signals that here the data that is provided is pseudo-haploid data, ie. for each allele listed in the vcf, the allele is a result of randomly choosing one of the two alleles in an individual (from mother's or father's haplotype, but independently chosen for each individual/genome position). The model still assumes that loci that do not appear in the VCF are non-segregating. 
 
  ```
 java -jar Chimp.jar --vcf_list=chrom1.vcf --ref_list=ref1.fasta --anc_list=anc1.fasta
         --out_file=results --rec_rate=.0000000125 --mut_rate=.0000000125 --base_n=10
-        --psh0_xs=1000,2000,3000 --psh0_ys=40000,20000,10000,5000 --ouput_steps
+        --psh0_xs=1000,2000,3000 --psh0_ys=40000,20000,10000,5000 --output_steps
 ```
 In the above example (for 10 haplotypes) we have not only customized the epoch partitions (to be [1000,2000,3000] which would have been unachievable with `t_bounds` and `dof` due to the non-exponential sequence), but we have also specified a prior guess of population sizes (40k,20k,10k,5k) in the epochs. This population history is where the EM will be initialized, instead of assuming a size of N_e in each epoch (computed from Waterson's estimate). The final option will also cause the method to output the intermediate population size histories as well after each EM step. This can be useful for analyzing convergence behavior or overfitting behavior of the method.
 
