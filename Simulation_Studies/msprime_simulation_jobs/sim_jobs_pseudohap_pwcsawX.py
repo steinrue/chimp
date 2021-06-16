@@ -13,8 +13,10 @@ if len(sys.argv) == 1:
     # THIS REQUIRES PWCSAWX DATA TO ALREADY HAVE BEEN SIMULATED.
     # THIS SCRIPT WILL REPROCESS THE PWCSAWX DATA AND CREATE PSEUDOHAPLOID DATA FROM IT
     
-    input = f'{home_path}/labshare/gupadhya_folder/sims_final/pwcsawX/pwcsawX_dataset'
-    output = f'{home_path}/labshare/gupadhya_folder/sims_final/pwcsawX_pseudo/pwcsawX_pseudo_dataset'
+    input = f'../data/pwcsawX/pwcsawX_dataset'
+    output = f'../data/pwcsawX_pseudo'
+    os.system(f"mkdir {output}")
+    output = ouput + '/pwcsawX_pseudo_dataset'
     replicates = 16
 
     '''

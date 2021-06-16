@@ -13,7 +13,7 @@ numpy.random.seed (4711)
 if len(sys.argv) == 1:
     home_path = str(Path.home())
 
-    datadir = f"{home_path}/labshare/gupadhya_folder/sims_final/bottle/"
+    datadir = f"../data/bottle/"
     prefix = "3p_200n_"
     dataset = "bottle_dataset"
 

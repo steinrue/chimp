@@ -13,7 +13,7 @@ numpy.random.seed (4711)
 if len(sys.argv) == 1:
     home_path = str(Path.home())
 
-    datadir = f"{home_path}/labshare/gupadhya_folder/sims_final/sawSPS_RM/"
+    datadir = f"../data/sawSPS_RM/"
     prefix = "20p_10n_RM_"
     dataset = "sawSPS_RM_dataset"
 
@@ -118,7 +118,7 @@ if len(sys.argv) > 1:
 
     # reassign map to the non-fake one
     home_path = str(Path.home())
-    input_genetic_map_file = f"{home_path}/labshare/gupadhya_folder/sims_final/sawSPS_RM/chr3map_msp.map"
+    input_genetic_map_file = f"../data/sawSPS_RM/chr3map_msp.map"
 
 
     ####################################

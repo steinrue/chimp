@@ -17,7 +17,8 @@ if len(sys.argv) == 1:
     #######################################3
 
     #datadir = "../sim_jobs"
-    datadir = f"{home_path}/labshare/gupadhya_folder/sims_final/bottleExp"
+    datadir = f"../data/bottleExp"
+    os.system(f"mkdir {datadir}")
     dataset = "bottleExp_dataset"
     dem_type="bottleExp" # "exp" or "bottle" or "bottleExp" or "pwcsaw" or "saw"
 

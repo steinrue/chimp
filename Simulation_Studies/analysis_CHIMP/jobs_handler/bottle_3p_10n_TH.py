@@ -10,10 +10,9 @@ from pathlib import Path
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"{home_path}/labshare/gupadhya_folder/sims_final/bottle/"
+    datadir = f"../data/bottle/"
     prefix = "3p_10n_TH_"
     dataset = "bottle_dataset"
-
 
 
     # make sure you create output directory to place all outfiles
@@ -28,7 +27,6 @@ if len(sys.argv) == 1:
         # make sure you create output directory to place all outfiles
         process = subprocess.Popen("mkdir "+ outDir, stderr=subprocess.PIPE, shell=True)
         process.communicate()
-
 
         i_file = open("job"+str(i+1)+".sh","w+" )
 

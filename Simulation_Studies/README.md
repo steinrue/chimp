@@ -12,7 +12,7 @@ For Simulating and analyzing data, we ran our code on a computing cluster that u
 In the msprime_simulation_jobs folder, running the python scripts titled "sim_jobs_\*" will simulate the various datasets we used in our studies. These scripts both create the jobs as \*.sh files, and immediately submit them using torque, before deleting the \*.sh files. This can be modified as needed.
 
 Simulating the data will also create a file of ordered pairs that represents the true demography that data was simulated under, and this is titled [demography]_truth.csv
-
+Data will be written to "/data/" folder, where directories will be created for the various demographies, and each will have 16 replicates of data.
 
 ### ANALYZING DATA:
 

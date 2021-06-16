@@ -7,7 +7,7 @@ from pathlib import Path
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"{home_path}/labshare/gupadhya_folder/sims_final/pwcsawX_pseudo/"
+    datadir = f"../data/pwcsawX_pseudo/"
     prefix = "15p_10n_Reg_"
     dataset = "pwcsawX_pseudo_dataset"
 

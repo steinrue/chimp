@@ -13,7 +13,7 @@ numpy.random.seed (4711)
 if len(sys.argv) == 1:
     home_path = str(Path.home())
 
-    datadir = f"{home_path}/labshare/gupadhya_folder/sims_final/pwcsawX/"
+    datadir = f"../data/pwcsawX/"
     prefix = "15p_10n_"
     dataset = "pwcsawX_dataset"
 
