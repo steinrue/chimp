@@ -20,4 +20,11 @@ lib/*.jar
 *.tar.gz
 *.rar
 
-.DS_Store
+# let's see whether we can ignore all "hidden" files
+.*
+
+# and some python specific stuff
+*.pyc
+
+# and let's try to ignore the entire simulated data
+Simulation_Studies/data

@@ -16,7 +16,7 @@ if len(sys.argv) == 1:
     input = f'../data/pwcsawX/pwcsawX_dataset'
     output = f'../data/pwcsawX_pseudo'
     os.system(f"mkdir {output}")
-    output = ouput + '/pwcsawX_pseudo_dataset'
+    output = output + '/pwcsawX_pseudo_dataset'
     replicates = 16
 
     '''
