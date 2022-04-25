@@ -10,6 +10,7 @@ Then in the analysis_CHIMP/job_handlers/ directory, the  python script `prepare1
 - `FIN_chr1_00p_l-5_TH_n2510.py`
 - `JPT_chr1_00p_l-5_TH_n2510.py`
 - `LWK_chr1_00p_l-5_TH_n2510.py`
+
 need to be executed to analyze the respective data. Each script checks for the availability of the reference fasta for Chromosome 1 and a fasta file containing the ancestral alleles. If these files are not present, it prints instructions where to download them. The scripts then submit these jobs through torque, and deletes the job files. The output is written to the analysis_CHIMP/out directory.
 
 
