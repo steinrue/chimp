@@ -17,7 +17,8 @@ if len(sys.argv) == 1:
     process = subprocess.Popen("mkdir "+ prefix_d, stderr=subprocess.PIPE, shell=True)
     process.communicate()
 
-    for i in [14]:#range(16):
+    for i in range(16):
+    # for i in [3]:
         datafile = dataset + str(i+1)
         outDir =  prefix_d + "/" + datafile
 

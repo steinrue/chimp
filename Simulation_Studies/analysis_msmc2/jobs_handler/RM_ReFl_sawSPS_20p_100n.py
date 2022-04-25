@@ -18,6 +18,7 @@ if len(sys.argv) == 1:
     process.communicate()
 
     for i in range(16):
+    # for i in [5]:
         datafile = dataset + str(i+1)
         outDir =  prefix_d + "/" + datafile
 

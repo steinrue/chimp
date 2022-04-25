@@ -117,8 +117,9 @@ if len(sys.argv) > 1:
     prepareAuxiliaryFiles (recoProb, numLoci, input_genetic_map_file, input_sample_file, input_poplabels_file)
 
     # reassign map to the non-fake one
+    # IMPORTANT: do it here because otherwise it would be overwritten with a fake one
     home_path = str(Path.home())
-    input_genetic_map_file = f"../data/sawSPS_RM/chr3map_msp.map"
+    input_genetic_map_file = f"../msprime_simulation_jobs/sim_sawSPS_recoMap/chr3map_msp.map"
 
 
     ####################################

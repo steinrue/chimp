@@ -25,6 +25,7 @@ import time
 lin_bin2 = "relate_v1.1.2_x86_64_static" #linux
 lin_bin3 = "relate_v1.1.3_x86_64_static"
 relateBinary = "./jobs_handler/py_scripts/binaries/"+lin_bin3+"/bin/Relate"
+# There was some bug in Relate in bin3, that's why we have this weird versioning
 relateFileFormatBinary = "./jobs_handler/py_scripts/binaries/"+lin_bin2+"/bin/RelateFileFormats"
 relatePopSizeScript = "./jobs_handler/py_scripts/binaries/"+lin_bin3+"/scripts/EstimatePopulationSize/EstimatePopulationSize.sh"
 
