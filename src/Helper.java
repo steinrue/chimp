@@ -2,15 +2,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.InputMismatchException;
+import java.util.Collections;
 import java.util.Random;
+import java.util.Scanner;
 
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.linear.DiagonalMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 import org.apache.commons.math3.ode.FirstOrderDifferentialEquations;
@@ -18,32 +17,21 @@ import org.apache.commons.math3.ode.FirstOrderIntegrator;
 import org.apache.commons.math3.ode.events.EventHandler;
 import org.apache.commons.math3.ode.nonstiff.DormandPrince853Integrator;
 
-import com.martiansoftware.jsap.FlaggedOption;
-import com.martiansoftware.jsap.JSAP;
-import com.martiansoftware.jsap.JSAPException;
-import com.martiansoftware.jsap.JSAPResult;
-import com.martiansoftware.jsap.Parameter;
-import com.martiansoftware.jsap.SimpleJSAP;
-import com.martiansoftware.jsap.Switch;
-
-
-import java.util.Scanner;
+import htsjdk.variant.variantcontext.GenotypesContext;
+import htsjdk.variant.vcf.VCFFileReader ;
 
 public class Helper {
 
 	public static void main(String[] args) throws IOException {
-
+		Helper help = new Helper();
 		
+//		String a = "e";
+//		String b = "ba";
+		System.out.println(Arrays.toString(help.generate_log_discretization(10,100,4)));
+//
+//		System.out.println(-13 % 10);
 		
-		Helper helper = new Helper();
-		
-		RealMatrix a = new Array2DRowRealMatrix(2,3);
-		int b = 21;
-		System.out.println(a);
-		
-		ChooseComputer chooser = helper.new ChooseComputer(10);
-		System.out.println(chooser.get1(10, 10));
-		
+		System.out.println (Arrays.toString ((help.getPsmcPartition (8, 50, 0.1 * 1d/45)).toArray()));
 	}
 
 	
@@ -165,6 +153,9 @@ public class Helper {
 		double time_counter = 0.;				
 		
 		
+//		/// time some stuff
+//		double stime = System.nanoTime();
+
 		
 		for(int t = 0 ; t < times.length; t++) {
 			
@@ -173,6 +164,12 @@ public class Helper {
 				integrator.integrate(ode, time_counter, residence_probs, times[t], residence_probs);
 				time_counter = times[t];
 			}
+			
+
+			
+//			System.out.println("current time: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds");
+			
+			
 			
 			
 			// store value of residence_probs at time time_counter for state1 and state2
@@ -186,15 +183,33 @@ public class Helper {
 		if(till_inf) {
 			
 			Converge converge_condition = new Converge(.0000000001, abs_indices);
-			integrator.addEventHandler(converge_condition, 100., .01 , 1000000);
-			integrator.integrate(ode, time_counter, residence_probs, 100000, residence_probs); 
+
+			// if we are already converged at the last time, we just take the current state again
+			// otherwise, we need to run until enough convergence
+			if (converge_condition.g(time_counter, residence_probs) > 0) {
+				// not yet converged, need to go some more
+				integrator.addEventHandler(converge_condition, 100., .01 , 1000000);
+				integrator.integrate(ode, time_counter, residence_probs, 100000, residence_probs); 
+			}
 			
+			// save whatever the right distribution for infitnity (converged) is
 			for(int s = 0 ; s < ode.getDimension() ; s++) {
 				out_res_probs[s][times.length] = residence_probs[s];
 			}	
 			
 		}
 		
+		
+
+//		System.out.println("current time: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds");
+//
+//		for (int timeIdx=n_cols-3; timeIdx<n_cols; timeIdx++) {
+//			double[] print_array = new double[ode.getDimension()];
+//			for (int stateIdx=0; stateIdx<print_array.length; stateIdx++) {
+//				print_array[stateIdx] = out_res_probs[stateIdx][timeIdx];	
+//			}
+//			System.out.println(Arrays.toString(print_array));
+//		}
 		
 
 		return out_res_probs;
@@ -470,9 +485,27 @@ public class Helper {
 		
 		RealMatrix out = pdf.copy();
 		
+		
+		///////////////////////////
+		//// USE MATTHIAS'S UNDERFLOW PREVENTION SCHEME
+		// ENDS UP CAUSING NON-INVERTIBLE MATRIX ERRORS DOWN THE ROAD FOR SOME CASES
+		double eps = 1e-12;
+		for(int i = 0 ; i < out.getRowDimension(); i++) {
+			for(int j = 0 ; j < out.getColumnDimension(); j++ ) {
+				if (out.getEntry(i, j) < eps) {
+					out.setEntry(i, j, eps);
+				}
+			}
+		}
+		out = out.scalarMultiply(1./this.totalEntriesMat(out));
+		//////////////////////////
+		
+		
+
+		
 		// make sure pdf is a proper pdf
 		double tot = this.totalEntriesMat(out);
-		if(Math.abs(tot - 1.0 ) > 0.0000001) {
+		if(Math.abs(tot - 1.0 ) > 0.00000001) {
 			System.out.println("Warning: PDF Matrix sum = " + tot); 
 		}
 		
@@ -501,7 +534,10 @@ public class Helper {
 				else if (type == 1) {out.setEntry(i, 0, 1.);}
 				else {System.err.print("Invalid prob_matrix type"); System.exit(0);}
 			}
-			else {r.mapDivideToSelf(r_sum); out.setRowVector(i, r);}
+			else {
+				r.mapDivideToSelf(r_sum); 
+				out.setRowVector(i, r);
+			}
 		}
 		if(underflow) {	System.err.println("ERROR: UNDERFLOW IN STATES"); }
 
@@ -670,6 +706,32 @@ public class Helper {
 		return out_p;
 	}
 	
+	// a psmc/msmc2 inspired partition in coalescent time, akin to the positive part of an exponential function - 1
+	// psmc-default: t_max=15, recency_factor=0.1
+	// msmc2 divides recency_factor by the number of pairs
+	RealVector getPsmcPartition (int nr_intervals, double t_max, double recency_factor) {
+		
+		
+		// we omit the first one, because it would be zero
+		double[] ts = new double[nr_intervals];
+		
+		for (int i=0; i<ts.length; i++) {
+			// reindex to omit first one
+			double x = i+1;
+			
+			// get the fractions between 0 and 1
+			x /=nr_intervals;
+
+			// get the exponent
+			x *= Math.log (1 + t_max/recency_factor);
+			
+			// and exponentiate
+			ts[i] = recency_factor*Math.exp(x) - recency_factor;
+		}
+
+		return new ArrayRealVector (ts);
+	}
+	
 	RealVector getTreeHeightPartitions(double[] bin_probs, int samples) {
 		// for constant population, computes the tree height/length partitions according to bin_probabilities 
 		// in units of coalescent time
@@ -835,10 +897,15 @@ public class Helper {
 		// array of filenames with datastreams for each chromosome/subsampling
 		private String[] data_stream_files = null;
 		
-		/// fraction that are segregating site across all loaded data (for Watersons Estimate)
-		private double frac_ss;
+		/// Average Watterson's estimate for theta across all streams
+		private double average_Wattersons_theta;
 		
-		dataStreamsHandler(String[] file_names, String[] reference_names, String[] ancestral_names,  int[] ls, int[][] sample_index_intervals, int max_tract_size, int mL_size, int n_samples, boolean binary_emission, String temp_prefix){
+		// total length of non-missing genome across all chromosomes and all subsamplings (ie total length of n-sample genome acted over as independent)
+		private double total_genetic_length;
+		
+		private int[][] haps_indices;
+		
+		dataStreamsHandler(ArrayList<String> file_names, ArrayList<String> reference_names, ArrayList<String> ancestral_names,  ArrayList<Integer> ls, ArrayList<int[]> hap_index_lists, int max_tract_size, int mL_size, boolean binary_emission, String temp_prefix){
 			// filenames, ref_names, anc_names, ls, sample_intervals, 
 			// each are array of equal length, and define the corresponding field for a datastream that we use for analysis
 			
@@ -847,30 +914,30 @@ public class Helper {
 			// target_folder is null if we are using memory, otherwise it is name of temporary file prefix
 		
 			
-			if(file_names.length == 0) {System.out.println("No Files Provided"); System.exit(0);}
 			
+			num_streams = file_names.size();
+			if(num_streams == 0) {System.out.println("No Files Provided"); System.exit(0);}
 			
-			// Elements to compute Watersons estimator for each datastream
-			// expectations computer class here is dummy, just used since the vcf's are read through that class
-			double num_ss = 0; // number of segregating sites
-			double num_sg = 0; // number of non-missing sites processed
+
+			// We compute Watersons estimator for each datastream
+			double wattersons_sum = 0;
 			
 			// check whether to use memory or files for the streams
 			if(temp_prefix == null) { streams_in_mem = true;}
 			
 			// initialize stream structures
-			num_streams = file_names.length;
 			if(streams_in_mem) {chromosome_streams = new int[num_streams][][] ;}
 			else { 	data_stream_files = new String[num_streams];  }
 			
+			//initialize the haps indices list for above streams
+			haps_indices = new int[num_streams][];
 			
 			// iterate through each stream and store appropriately. also scan to compute waterson's estimate
 			for(int s = 0 ; s < num_streams ; s++) {
 				// make sure that the sample_index_intervals are consistent with the num-samples
-				int[] interval = sample_index_intervals[s];
-				if(interval[1] - interval[0] + 1 != n_samples) {System.out.print("Inconsistency in specified interval and num samples"); System.exit(0);}
+				int[] subgroup_indices = hap_index_lists.get(s);
 				
-				VcfReader temp = new VcfReader(file_names[s], reference_names[s], ancestral_names[s], ls[s], interval);
+				VcfReader temp = new VcfReader(file_names.get(s), reference_names.get(s), ancestral_names.get(s), ls.get(s), subgroup_indices);
 				temp.update_max_tract_size(max_tract_size);
 				int[][] stream = temp.getStream(mL_size);
 				
@@ -884,22 +951,38 @@ public class Helper {
 					data_stream_files[s] = temp_prefix + "_datastream_" + s;
 					write_dataStreamToCSV(data_stream_files[s], stream);
 				}
+				haps_indices[s] = subgroup_indices;
 				
 				// scan stream, count total number seg sites and total sites processed
-				int[] ss_frac = getFracSS(mL_size, n_samples, stream, binary_emission);
-				num_ss = num_ss + ss_frac[0]; // total number of segregating sites
-				num_sg = num_sg + ss_frac[1]; // total number of non missing sites processed
+				int[] ss_frac = getFracSS(mL_size, stream, binary_emission);
+				// compute watterson's theta, and add to running total
+				wattersons_sum = wattersons_sum + estimate_watersons_theta(1.0*ss_frac[0]/ss_frac[1], subgroup_indices.length)*ss_frac[1];
+				total_genetic_length = total_genetic_length + ss_frac[1];
 			}
 			
-			frac_ss = num_ss / num_sg ;
-
+			average_Wattersons_theta = wattersons_sum / total_genetic_length;
 		}
 		
 		
+		protected double estimate_watersons_theta(double f_ss, int n_s) {
+			// find wattersons theta, given fraction of segregating sites computed already
+			// just divides f_ss by harmonic sum
+			
+			double harmonic = 0;
+			for(int i = 1 ; i < n_s ; i++) {
+				harmonic = harmonic + 1.0/i ;
+			}
+					
+			return f_ss/harmonic;
+		}
 		
 		
-		double getFSS() {
-			return frac_ss;
+		double get_Watterson() { // get AVG Watterson's theta across all streams
+			return average_Wattersons_theta;
+		}
+		
+		double getGenLen() {
+			return total_genetic_length;
 		}
 		
 		int[][] getStream(int s){
@@ -916,6 +999,11 @@ public class Helper {
 			}
 		}
 		
+		int get_ns(int s) {
+			// return n_s for the s'th stream
+			return haps_indices[s].length;
+		}
+		
 		void deleteStreamFiles() {
 			if(!streams_in_mem) {
 				for(int f = 0 ; f < num_streams ; f++) {
@@ -926,7 +1014,21 @@ public class Helper {
 		}
 		
 		
-		
+		int[] get_ns_list() { // returns set of unique n_s values as specified by the hap_index_lists
+			ArrayList<Integer> ns_list = new ArrayList<Integer>();
+			for(int i = 0 ; i < haps_indices.length; i++) {
+				if (!ns_list.contains(new Integer(haps_indices[i].length))) {
+					ns_list.add(new Integer(haps_indices[i].length));
+				}
+			}
+			// copy to int[] instead of arrayvector
+			int[] out = new int[ns_list.size()];
+			for(int i = 0 ; i < out.length; i++) {
+				out[i] = ns_list.get(i);
+			}
+			
+			return out;
+		}
 		
 		
 		
@@ -988,11 +1090,11 @@ public class Helper {
 		return out;
 	}
 	
-	int[] getFracSS(int mls, int samps, int[][] stream, boolean binary_emission) {
+	int[] getFracSS(int mls, int[][] stream, boolean binary_emission) {
 		// input is metaLocus_size, number of samples, and datastream
 		int num_tracts = stream[0].length;		
-		int nss = 0; // number of segregating sites of genome
-		int tsg = 0; // total sites of genome
+		int nss = 0; // number of segregating sites in stream
+		int tsg = 0; // total sites spanned by stream
 		
 		if(mls == 1) {
 			for(int i = 0 ; i < num_tracts ; i++) {
@@ -1004,7 +1106,7 @@ public class Helper {
 		}
 		
 		else {
-			if((binary_emission && stream.length != 2) || (!binary_emission && stream.length != samps) ) {
+			if(binary_emission && stream.length != 2 ) {
 				System.out.println("Stream structure shape mismatch"); System.exit(0);
 			}
 			
@@ -1021,270 +1123,118 @@ public class Helper {
 		return new int[] {nss,tsg} ;
 	}
 	
-	protected double estimate_watersons_CR(double f_ss, int n_s, double theta) {
-		// find wattersons estimate for pop size, given fraction of segregating sites computed already
 
-		// estimates coalescent rate based on fraction of segregating sites, number of samples, and scaled mutation rate THETA
-		// if theta is rescaled, then coalescent rate is appropriately rescaled. 
-		
-		double harmonic = 0;
-		for(int i = 1 ; i < n_s ; i++) {
-			harmonic = harmonic + 1.0/i ;
-		}
-		
-		double x1 =  f_ss/harmonic;
-		
-		return theta / x1;
-	}
-	
 	double emToSimpScale(double simp_scale_start, double em_iteration) {
 		double out = (simp_scale_start * 1.5) * (Math.pow(0.95, em_iteration));
 		return out;
 	}
 	
-	JSAPResult wrap_arg_parser(String[] args, String help_description) throws IOException, JSAPException {
-		SimpleJSAP jsap = new SimpleJSAP("CHMM Scheme",
-				help_description,
-				new Parameter[] {
-						
-						
-						//////////
-						///////// REQUIRED PARAMETERS ///////////////////
-						//////////
 
-						
-						
-						// DEMOGRAPHIC PARAMS
-						//////////
-						
-						// RECOMBINATION RATE: --rec_rate
-						new FlaggedOption("recombination_rate", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT, JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "rec_rate",
-								"Recombination rate, specified per generation per nucleotide (recommend .0000000125 for human data)."),
-						
-						// MUTATION RATE: --mut_rate
-						new FlaggedOption("mutation_rate", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "mut_rate",
-								"Mutation rate along a lineage, specified per generation per nucleotide (recommend .0000000125 for human data)."),
-						
-						// SAMPLES IN SINGLE TREE: --base_n
-						new FlaggedOption("base_n_samples", JSAP.INTEGER_PARSER, JSAP.NO_DEFAULT , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "base_n",
-								"Number of haplotypes considered in each parallel CHMM model (The total number of haplotypes analyzed is <base_n> * <n_groups> under our composite likelihood scheme). We recommend at most choosing --base_n=10 (though for TMRCA the method is still tractable up to 30) and adjusting <n_groups> accordingly to tackle larger sample sizes."),
-						
-						
-						// FILE PARAMS
-						//////////
-
-
-						// INPUT VCF DATA FILE LIST: --vcf_list
-						new FlaggedOption("vcf_file_list", JSAP.STRING_PARSER, JSAP.NO_DEFAULT , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "vcf_list",
-								"List of VCF files for each chromosome to perform inference on. Will analyze the first (<base_n> * <n_groups>) haplotypes in each file.").setList(true).setListSeparator(','),
-							
-						// REFERENCE DATA FILE LIST: --ref_list
-						new FlaggedOption("ref_file_list", JSAP.STRING_PARSER, JSAP.NO_DEFAULT , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "ref_list",
-								"List of reference files for each chromosome. Indexing and length of list should match [vcf_list] and [anc_list].").setList(true).setListSeparator(','),
-						
-						// ANCESTRAL DATA FILE LIST: --anc_list
-						new FlaggedOption("anc_file_list", JSAP.STRING_PARSER, JSAP.NO_DEFAULT , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "anc_list",
-								"List of ancestral files for each chromosome. Can specify same files as [ref_list] if you don't have these (though accuracy may be affected if reference alleles and ancestral alleles are not the same).").setList(true).setListSeparator(','),
-						
-						// OUTPUT FILE: --out_file
-						new FlaggedOption("output_file", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "out_file",
-								"Prefix for output files CHIMP will produce with the inference results. CSV contains ordered pairs of [time, population size], and PARAM file contains, for each epoch, [epoch's lower bound (time), inferred population size]. Times are given in generations from present, and population sizes are in number of diploid individuals."),
-						
-						
-						
-						//////////
-						///////// OPTIONAL VISIBLE PARAMETERS ///////////////////
-						//////////
-						
-
-						// NUMBER OF GROUPS OF SUBSAMPLES: --n_groups
-						new FlaggedOption("sub_sample_groups", JSAP.INTEGER_PARSER, "1" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "n_groups",
-								"Number of subordinate CHMMs (each considering <base_n> haplotypes) analyzed in composite analysis. Total number of haplotypes analyzed is  <base_n> * <n_groups>."),
-						
-						// LEFT AND RIGHT BOUND OF TIME IN CONSIDERED HISTORY: --t_bounds
-						new FlaggedOption("time_bounds", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT , JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "t_bounds",
-								"This is used to specify epochs for population size history. The epoch boundaries will be spaced exponentially between <min_time> and <max_time>. Defaults to [Ne/50, 5*Ne] where Ne is computed from Waterson's estimator.").setList(true).setListSeparator(','),
-						
-						// NUMBER OF INDEPENDENT PARAMETERS TO USE IN MODELING PSH: --dof
-						new FlaggedOption("degrees_of_freedom", JSAP.INTEGER_PARSER, "18" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "dof",
-								"Number of epochs of population size history between [t_bounds] (with 2 additional epochs added at boundaries). One parameter is inferred for each epoch during EM. Note that dof=X will yield X+2 epochs."),
-						
-						// INITIAL POPULATION SIZE HISTORY GUESS: --psh0
-						new FlaggedOption("initial_size_guess", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT , JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "psh0",
-								"Initial guess for population size. Default is to use Waterson's estimate for N_effective, computed from data (and based on the specified mutation rate). Specifying this option will also use <psh0> instead of Waterson's estimate in computing default for [t_bounds] and the partitioning CHMM states."),
-							
-						// INITIAL POPULATION SIZE HISTORY DOMAIN: --psh0_xs
-						new FlaggedOption("initial_psh_xs", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "psh0_xs",
-								"Specify custom list of epoch boundaries (overrides [t_bounds], and <dof>) to use for population size history model.").setList(true).setListSeparator(','),
-							
-						// INITIAL POPULATION SIZE HISTORY VALS GUESS: --psh0_ys
-						new FlaggedOption("initial_psh_ys", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "psh0_ys",
-								"Specify population sizes (must also have specified [psh0_xs]) to initialize EM. This option overrides psh0. [psh0_ys] must be a vector with size 1 greater than that of [psh0_xs].").setList(true).setListSeparator(','),
-						
-						// NUMBER OF STATES IN CHMM: --n_states
-						new FlaggedOption("num_chmm_states", JSAP.INTEGER_PARSER, "50" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "n_states",
-								"Number of discrete states for CHMM (discrete intervals into which TMRCA or L falls). States are partitioned according to equal probability for each state under a constant population size prior (Waterson's estimate)."),
-						
-						// METALOCUS IMPLEMENTATION, BEST USED WITH TREELENGTH --metalocus_size
-						new FlaggedOption("metalocus_size", JSAP.INTEGER_PARSER, "500" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "metalocus_size",
-								"Number of bases grouped into each metalocus. Selecting metalocus_size=1 will activate a locus skipping algorithm to aid computational efficiency."),
-						
-						// MAX NUMBER OF EM STEPS: --em_cap
-						new FlaggedOption("max_em_steps", JSAP.INTEGER_PARSER, "50" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "em_cap",
-								"Maximum number of EM steps performed. Inference will end sooner if the convergence criterion is met."),
-						
-						// MAX NUMBER OF EVALS IN M STEP: --m_evals
-						new FlaggedOption("m_step_cap", JSAP.INTEGER_PARSER, JSAP.NO_DEFAULT , JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "m_evals",
-								"Maximum number of transition/emission matrix evaluations allowed during maximization step. Default scales with number of parameters (2 * <dof> + 10) since higher dimensional spaces will need more function evaluations to optimize effectively. M-step will terminate sooner if optimization converges."),
-						
-						// CRITERION FOR EM CONVERGENCE: --ll_converge
-						new FlaggedOption("em_convergence_criterion", JSAP.DOUBLE_PARSER, ".02" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "ll_converge",
-								"Absolute threshold used to determine convergence of EM. If the posterior log-likelihood improves by less than this amount after any EM step, we consider the method converged."),
-						
-						// SWITCH TO USE TOTAL TREE LENGTH INSTEAD OF TMRCA: --tree_length
-						new Switch("tree_length_switch", 'l', "tree_length", 
-								"Use this to specify use of total branch length (L) instead of tree height (TMRCA) as representation of the CHMMs hidden state."),
-					
-						// PRINT ALL INTERMEDIATE STEPS: --output_steps
-						new Switch("print_intermediate_psh", JSAP.NO_SHORTFLAG, "output_steps",
-								"This option will produce new output files after each EM step, titled \"EMstep_X\" where X is the EM step number. The files will be placed in a new folder entitled <out_file>."),
-						
-						// SWITCH FOR PSEDUOHAPLOID EMISSION MODEL --pseudo
-						new Switch("pseudo_haploid", JSAP.NO_SHORTFLAG, "pseudo", 
-								"Use this switch to specify that the data is pseudohaploid data. CHIMP will assume each allele for each variant in the VCF is randomly selected from either haploid of a diploid individual (independently for each variant/individual). Emission probabilities will be adjusted accordingly."),
-					
-						
-						
-						
-						
-						
-						
-						
-						/////////////
-						//////////// INVISIBLE PARAMETERS
-						/////////////
-
-						
-						///////////// SOMETIMES USEFUL
-
-						// HIDDEN STATE PROBABILITY PARTITIONS: --partitions
-						new FlaggedOption("partition_vector", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT,
-								JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "partitions",
-								"List of marginal probabilities to partition states of the CHMM. Under a constant population prior (from Waterson's estimate) the marginal probability of the TMRCA or L falling into each state will be given by [partitions]. The probabilities are indexed so that the first probability corresponds to the state with the smallest TMRCA (or L) and the last corresponds to the largest. [partitions] should sum to 1. This option overrides n_states.").setList(true).setListSeparator(','),
-						
-						// INTERNAL POPULATION RESCALE FACTOR: --ps_scale
-						new FlaggedOption("population_rescale_factor", JSAP.DOUBLE_PARSER, "1000" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "ps_scale",
-								"Internal Population Rescale Factor. Modify this if ODE stepsize error thrown."),
-						
-						// MAXIMUM TRACT SIZE, REDUCE THIS TO AVOID UNDERFLOW IN FB ALGORITHM
-						new FlaggedOption("max_tract_size", JSAP.INTEGER_PARSER, "1000" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "max_tract",
-								"Maximum Tract Length of monomorphic tracts during locus skipping-algorithm. The locus-skipping algorithm is only used if <metalocus_size>=1. Reduce <max_tract> to avoid underflow errors during the E step."),
-						
-						// TREE LENGTH PDE RESOLUTION: --pde_res
-						new FlaggedOption("pde_resolution", JSAP.INTEGER_PARSER, "1000,250" ,
-								JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "pde_res",
-								"Density of PDE solver's grid over the range of relevant times/lengths when using tree-length as hidden state. Higher density increases accuracy but also run-time. First parameter is for the emission probability solver (2D), and second is for transition probability solver (3D). This field is ignored for TMRCA.").setList(true).setListSeparator(','),
-						// note can have one or two numbers for the TRANSITION rez (one means evenly spaced, 2 means even for each of the T/2, T/n epochs)
-											
-						// SIMPLEX SCALE PARAMETER: --simplex_scale
-						new FlaggedOption("simplex_init_scale", JSAP.DOUBLE_PARSER, ".1" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "simplex_scale",
-								"Size (edge length) of simplex used in M step. Since the search is in log space, 1.0 corresponds to an e-fold increase/decrease of the population size parameter."),
-						
-						// SWITCH FOR FIXING SIMPLEX SCALE OVER ITERATIONS: --fix_ss
-						new Switch("fixed_simplex_scale", JSAP.NO_SHORTFLAG, "fix_ss", 
-								"Use this switch to use same size of simplex for all EM steps (default is to slightly shrink the simplex on each successive step)."),
-						
-						// SCRATCH FOLDER FOR DATASTREAM FILES: --disc_storage 
-						new FlaggedOption("temporary_file_prefix", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "disc_storage",
-								"Use option to store intermediate data structures temporarily on the disc (default stores them in RAM). Using this option may decrease RAM usage, but may increase run-time since structures will be stored to and read from disc."),
-						
-						// CHROMOSOMAL LENGTHS FOR VCFS: --chr_l
-						new FlaggedOption("chromosomal_length_list", JSAP.INTEGER_PARSER, JSAP.NO_DEFAULT , JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "chr_l",
-								"List of chromosome lengths for each VCF. Will analyze positions [1,length] for each file. Indices of [chr_l] should match those of [vcf_list]. If not provided, the reference file will determine the contiguous chromosomal tract that is analyzed.").setList(true).setListSeparator(','),
-						
-						
-						///////////// NOT EXTENSIVELY TESTED
-						
-						// REGULARIZATION COEFFICIENT LAMBDA: --reg_lambdas
-						new FlaggedOption("regularizing_parameters", JSAP.DOUBLE_PARSER, "0,0,0,0" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "reg_lambdas",
-								"Regularizing coefficients used in likelihood optimization. Coefficients of [d0l2, d1l1, d1l2, d2l2] respectively. These coefficients are multiplied by [d0l2,d1l1,d1l2,d2l2] respectively and are subtracted from the objective function. d0l2 corresponds to the squared deviation from a constant population (Waterson’s estimate). d1l1 corresponds to the absolute value difference of the population size change between adjacent epochs, while d1l2 corresponds to the squared difference of the same. d2l2 is an analog for the square of the second derivative (computed for discrete epochs instead), and upweighting it will penalize deviations from linear behavior. The default is no regularization.").setList(true).setListSeparator(','),
-						
-						// SWITCH FOR REQUESTING SPLINE PSH MODEL: -s --spline
-						new Switch("splines", JSAP.NO_SHORTFLAG, "spline", 
-								"This option is not fully tested. It specifies that the population size history will be modeled by a cubic spline function (instead of piece-wise constant). The PARAM file will not be generated.  This can be used in conjunction with [t_bounds] and <dof>, which will specify the bounds of the spline and the number of nodes respectively. This should not be used with [psh0_xs] or [psh0_ys]."),
-						
-						// SWITCH FOR LINEAR TIME MODEL: --lin_t
-						new Switch("linear_time", JSAP.NO_SHORTFLAG, "lin_t", 
-								"This will distribute the epoch partitions uniformly on a linear scale rather than on a log scale."),
-						
-						///////////// SHOULD BE FULLY HIDDEN FROM USER
-						
-						// SIMPLEX TYPE: --s_type
-						new FlaggedOption("simplex_type", JSAP.INTEGER_PARSER, "0" , JSAP.REQUIRED, JSAP.NO_SHORTFLAG, "s_type",
-								"ID for simplex type that EM_HMM uses at each em step. Default corresponds to an equilateral simplex centered on the current value, adjusted to include current value if it is better than the worst vertex."),
-						
-						// DIRECTORY WHERE DATA FILES ARE STORED: --data_dir
-						new FlaggedOption("data_file_directory", JSAP.STRING_PARSER, JSAP.NO_DEFAULT , JSAP.NOT_REQUIRED, JSAP.NO_SHORTFLAG, "data_dir",
-								"Directory where data files are stored (include trailing \"/\"). Prepends this to all input files."),
-						
-						// SWITCH TO USE SFS FOR INFERENCE
-						new Switch("SFS_switch", JSAP.NO_SHORTFLAG, "sfs", 
-								"Use this switch to specify use of Site Frequency Spectrum (will not use linkage info). Computes marginal from TMRCA transition probability matrix. This is a highly inefficient implementation of SFS based demographic inference."),
-						
-						// SWITCH FOR BINARY EMISSION MODEL --binary_emission
-						new Switch("binary_emission", JSAP.NO_SHORTFLAG, "binary_emission", 
-								"Use this switch to specify model with only 2 emission possibilities, segregating or non-segregating."),
-					
-						
-					
-						
-						//////////////////
-						// IN TESTING
-						/////////////////
-						
-						
-						
-						
-						
-						
-				}
+	int[][] hap_ind_file_read(String file_name) {
 		
-		);
-	
-		
-		
-		JSAPResult arguments = jsap.parse(args); // obtain the holder which has parsed and knows all the arguments
-		
-		// Print Usage options if we run into issues, or help is tagged
-		if (!arguments.success()) {
+		int[][] out = null;
+		try {
+			// initialize scanner
+			Scanner scanner = new Scanner(new File(file_name));
+			Scanner line_scan;
 			
-	        System.err.println();
-	        System.err.println("Usage:  ");
-	        System.err.println("                "+ jsap.getUsage());
-	        System.err.println();
-            System.err.println(jsap.getHelp());
-	        System.err.println();
+			// Fill holder structures with the data from the file going line by line
+			ArrayList<int[]> holder = new ArrayList<int[]>();
+						
+			while(scanner.hasNextLine()) {
+				// write in one line at a time
+				line_scan = new Scanner(scanner.nextLine());  line_scan.useDelimiter("\\s*,\\s*");
+				ArrayList<Integer> subgroup = new ArrayList<Integer>();
+				
+				// process the line
+				while(line_scan.hasNextInt()) {
+					subgroup.add(line_scan.nextInt());
+				}
+				
+				// see if it looks good
+				if (subgroup.size() < 2) {
+					System.out.println("Haplotype group to analyze has size less then two. Maybe file-formatting incorrect. Has to be one list of comma-separated integers on each line.");
+					System.exit(-1);
+				}
+				if (Collections.min(subgroup) <= 0) {
+					System.out.println ("Minimum index in haplotype group is 0 or less. Start indexing at 1.");
+					System.exit(-1);
+				}
 
-	        
-			if(!arguments.success()) {
-				for (java.util.Iterator errs = arguments.getErrorMessageIterator();
-	                    errs.hasNext();) {
-	                System.err.println("Error: " + errs.next());
-	            }
-		        System.err.println();
+				// convert to int[]
+				int[] subgroup_array = new int[subgroup.size()];
+				for(int i = 0 ; i < subgroup_array.length ; i++) {subgroup_array[i] = subgroup.get(i);}
+				
+				// write to holder
+				line_scan.close();
+				holder.add(subgroup_array);
+				
 			}
-			System.exit(1);
+			
+			// copy from holder structures into the out object
+			out = new int[holder.size()][];
+			for(int i = 0 ; i < out.length; i++) {out[i]= holder.get(i);}
+			
+			scanner.close();
+		} 
+		
+		catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.out.print("Could not read dataStream from the file"); System.exit(0);
+		}
+		return out;		
 
-	    }
+	}
+
+	int get_max_samples_from_VCFs(String[] vcfs) {
+		int out = -1;
+		for(int i = 0 ;i < vcfs.length ; i++) {
+			VCFFileReader v_read = new VCFFileReader(new File(vcfs[i]),false);
+			
+			// get num of haps in vcf
+			//int v_samp = v_read.iterator().next().getSampleNames().size();
+			
+			GenotypesContext temp = v_read.iterator().next().getGenotypes();
+			int v_samp = temp.getMaxPloidy(0)*temp.getSampleNames().size();
+
+			// record this if its the first, otherwise make sure it agrees with other files'
+			if(out > -1) {
+				if( v_samp != out) { System.out.println("Error: VCFs have different numbers of samples.");System.exit(0); }
+			}
+			else { out = v_samp; }
+			v_read.close();
+		}
 		
-		
-		//modify default values contingently
-		
-		
-		
-		return arguments;
+		return out;
 	}
 	
+	int[][] default_hap_groups(int[] n_samps, int[] n_groups){
+		
+		ArrayList<int[]> out = new ArrayList<int[]>();
+		
+		for(int i_ns = 0 ; i_ns < n_samps.length; i_ns++) { // go through each ordered pair of an element n_s and the number of groups associated
+			int ns = n_samps[i_ns];
+			int groups = n_groups[i_ns];
+			
+			// for each ordered pair create the appropriate number of groups
+			for(int i = 0 ; i < groups ; i++) {
+				int[] temp = new int[ns];
+				
+				// for each group, use non-overlapping n_s samples 
+				for(int j = 0; j < ns ; j++) {
+					temp[j] = ns * i + j + 1;  
+				}
+				out.add(temp);
+			}		
+		}
+		
+		// list -> array and return
+		int[][] haps_groups = new int[out.size()][];
+		for(int i = 0 ; i < haps_groups.length;i++) { haps_groups[i]=out.get(i);}
+		return haps_groups;
+	
+	}
 	
 	
 }

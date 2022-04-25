@@ -320,7 +320,7 @@ public class TL_1P_Transitions extends TransitionsComputer {
 
 	@Override
 	double[][] getPsFromDemo() {
-		double[][] out = new double[2][];
+		double[][] out = new double[3][];
 		
 		out[0] = coalescence_rate.getFunctionParameters();
 		out[1] = new double[] {recombination_rate};

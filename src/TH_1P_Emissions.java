@@ -31,6 +31,11 @@ public class TH_1P_Emissions extends EmissionsComputer {
 	@Override
 	void updateCDF() {
 
+
+//		d_times[d_times.length-1] = 584.7962407069716;
+//		System.out.println(Arrays.toString(d_times));
+		
+		
 		double[][] res_prob = helper.odeSolsAtTimes(this, this.getInitialResProbs(), d_times, t_step_precision, true, this.getAbsorbingStateIndices()) ;
 		
 		// hold onto residence probabilities only of absorbing states (where we have found tmrca)
@@ -116,17 +121,17 @@ public class TH_1P_Emissions extends EmissionsComputer {
 	void updateDemoFromPs(double[][] params) {
 
 		coalescence_rate.updateFromParams(params[0]);
-		mutation_rate = params[1][0];
+		mutation_rate = params[2][0];
 		
 		upToDate = false;
 	}
 
 	@Override
 	double[][] getPsFromDemo() {
-		double[][] out = new double[2][];
+		double[][] out = new double[3][];
 		
 		out[0] = coalescence_rate.getFunctionParameters();
-		out[1] = new double[] {mutation_rate};
+		out[2] = new double[] {mutation_rate};
 		
 		return out;
 	}

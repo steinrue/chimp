@@ -11,6 +11,8 @@ import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 
+import com.martiansoftware.jsap.JSAPException;
+
 
 public class Expectation_FBskip extends ExpectationsComputer {
 	Helper helper = new Helper();
@@ -37,9 +39,6 @@ public class Expectation_FBskip extends ExpectationsComputer {
 	
 	
 	public static void main(String[] args) {
-		
-
-		
 	}
 
 		
@@ -51,10 +50,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 	Expectation_FBskip(RealMatrix tp, RealMatrix ep, RealVector sd) {
 		super(tp, ep, sd);
 		
-		// get matrix parts for monomorphic tracts of non segregating sites
-		mono_nss = new SingleSiteMovementMatrix(ep.getColumnVector(0), 1);
-		mono_mis = new SingleSiteMovementMatrix(new ArrayRealVector( tp.getColumnDimension(), 1.0) ,2);
-		
+
 	}
 	
 	private class SingleSiteMovementMatrix{
@@ -190,7 +186,13 @@ public class Expectation_FBskip extends ExpectationsComputer {
 	@Override
 	void computeExps() {
 		// reroute to new method if need to use metalocus framework
-		if(mL_size > 1) {computeExps_mL(); return;} // mL_size=1 defaults to locu skipping
+		if(mL_size > 1) {computeExps_mL(); return;} // mL_size=1 defaults to locus skipping
+		
+		// get matrix parts for monomorphic tracts of non segregating sites. only do this if doing locus skipping method, otherwise don't need ot
+		mono_nss = new SingleSiteMovementMatrix(eM0.getColumnVector(0), 1);
+		mono_mis = new SingleSiteMovementMatrix(new ArrayRealVector( tM0.getColumnDimension(), 1.0) ,2);
+		///
+		
 		
 		double stime = System.nanoTime(); // just to time this method
 		
@@ -258,12 +260,14 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		
 		
 		System.out.println("\n <--> FB algorithm: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds\n");
+		System.out.println("LL="+posteriorLL+"\n");
 
 		return;
 	}
 
 ///////////////////////////////////////////////////////////////////////////
 	
+	// These are FB algorithm implemented by skipping along monomorphic tracts
 	
 	private void forwardsFill(RealVector[] salphas, RealVector[] salphas_l, double[] scale_cs, double[] norm_unity_factors) {
 		
@@ -422,8 +426,14 @@ public class Expectation_FBskip extends ExpectationsComputer {
 	
 ///////////////////////////////////////////////////////////////////////////
 	
+	// this is implemented to go site by site (no skipping)
+	
 	// METHODS INVOLVED IN WRITING POSTERIOR DISTROS DOWN
-	public void computePosteriorDistros(String output_file, double[] head_bins,  int metalocus_size) throws IOException {
+	public void computePosteriorDistros(String output_file, double[] head_bins,  int avg_window_size) throws IOException {
+		
+		// reroute to new method if need to use metalocus framework
+		if(mL_size > 1) {computePosteriorDistros_ML(output_file, head_bins); return;} // mL_size=1 defaults to locus skipping
+				
 		
 		double stime = System.nanoTime(); // just to time this method
 				
@@ -439,7 +449,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		// setup the output files, and metaloci recorders for the full and reduced printers
 		FileWriter full_scribe= new FileWriter(output_file+ ".csv"); full_scribe.append(getHeader(head_bins)+" \n");
 		//FileWriter red_scribe= new FileWriter(output_file+ "_reduced.csv"); red_scribe.append(getHeader(head_bins)+" \n");
-		metalocusRecorder full_rec = new metalocusRecorder(full_scribe, metalocus_size);
+		metalocusRecorder full_rec = new metalocusRecorder(full_scribe, avg_window_size);
 		//metalocusRecorder red_rec = new metalocusRecorder(red_scribe, 1);
 		
 		
@@ -460,7 +470,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		for(int tract = n_loci - 2 ; tract > -1 ; tract-- ) { // iterate through each tract in reverse order
 			
 			// compute beta then alpha at last spot in the tract (from the leftmost point of following tract)
-			position--;
+			position--; if(((chrom_length - position) % 100000) == 0) {System.out.println("Computed posterior for "+(chrom_length - position)+" bases");}
 			sbeta = tM0.operate(emissionColumn(obs[0][tract+1]).ebeMultiply(sbeta));
 			sbeta.mapDivideToSelf(sbeta.getL1Norm());
 			salpha = salphas_left_adjacent[tract+1];
@@ -481,7 +491,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 			// walk backwards along all the monomorphic steps
 			for(int l = tract_length - 1 ; l > 0 ; l-- ) {
 				
-				position--;
+				position--; if(((chrom_length - position) % 100000) == 0) {System.out.println("Computed posterior for "+(chrom_length - position)+" bases");}
 				
 				// compute alpha and beta at new position. note for alpha we are reversing the forwards process
 				sbeta = mono.m_mat.operate(sbeta);
@@ -514,6 +524,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		full_scribe.flush(); full_scribe.close();
 		//red_scribe.flush(); red_scribe.close();
 		System.out.println("\n <--> FB algorithm for posteriors: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds\n");
+		System.out.println("LL="+posteriorLL+"\n");
 		return;
 	}
 		
@@ -605,9 +616,12 @@ public class Expectation_FBskip extends ExpectationsComputer {
 
 	
 
-
+////////////////////////////////////////////////////////////
+// METALOCUS IMPLEMENTATION - This is the default that gets used
 ////////////////////////////////////////////////////////////
 
+	// 
+	
 	// HAVE ALREADY CONFIRMED THAT ml_size=1 MATCHES RESULTS OF LOCUS SKIPPING, so now ml_size=1 defaults to locus skipping
 	void computeExps_mL() {
 
@@ -681,11 +695,12 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		expTr.setSubMatrix(teX.getSubMatrix(0, teX.getRowDimension()-1, 0, teX.getColumnDimension()-1).getData(),0, 0);
 
 		
-		System.out.println("\n <--> FB algorithm: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds\n");
-
+		System.out.print("\n <--> FB algorithm: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds\n");
+		System.out.println("LL="+posteriorLL+"\n");
 	}
 	
 	// forwards backwards scaled quantities salphas, sbetas and scale_cs
+	
 	private void fbAB_sf_mL_fill(RealVector[] salpha, RealVector[] sbeta, double[] scale_lnc ){
 				
 		// FORWARDS ALGORITHM
@@ -706,7 +721,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 			//ebe multiplication of emission and residence vectors
 			temp = bmL.add(l_res_prob);
 			
-			// Set states with low res-prob to 0 resprob otherwise
+			// Set states with low res-prob to 0 resprob, otherwise
 			// they mess numerics in next steps
 			for(int iii = 0 ; iii < temp.getDimension(); iii++) {
 				if(temp.getEntry(iii) < -675.){ temp.setEntry(iii, Double.NEGATIVE_INFINITY); }
@@ -755,6 +770,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		return;
 	}
 	
+	
 	private RealVector mL_emitP(int mL_obs) {
 		// mL_obs is the index in obs[x][mL_obs] corresp to column for emission
 		
@@ -799,6 +815,7 @@ public class Expectation_FBskip extends ExpectationsComputer {
 		return out;
 	}
 
+	
 	private double getMinDefVal(RealVector in) {
 		// return the minimum value that is well defined (not negative infinity)
 		double out = Double.POSITIVE_INFINITY;
@@ -811,9 +828,76 @@ public class Expectation_FBskip extends ExpectationsComputer {
 	}
 	
 	
+	public void computePosteriorDistros_ML(String output_file, double[] head_bins) throws IOException {
+		
+
+		double stime = System.nanoTime(); // just to time this method
+
+					
+		// initialize holders and fill salpha and sbeta vals
+		RealVector[] salpha = new RealVector[n_loci];
+		RealVector[] sbeta = new RealVector[n_loci];
+		double[] scale_lnc = new double[n_loci];
+				
+		fbAB_sf_mL_fill(salpha, sbeta, scale_lnc);
+				
+		// compute and store the log_likelihoods			
+		double likelihood = 0;
+		for(int t = 0 ; t < n_loci ; t++) {
+			likelihood += scale_lnc[t];
+		}
+		posteriorLL = likelihood;
+		
+		
+		
+		
+		// setup File Writers
+		FileWriter ofile= new FileWriter(output_file+ ".csv"); ofile.append(getHeader(head_bins)+" \n");
+		mL_scribe scribe = new mL_scribe(ofile, mL_size);
+		
+		
+
+		
+		// compute gammas and add emission expectations
+		for(int t = n_loci - 1 ; t >= 0 ; t--) {
+			RealVector gamma = salpha[t].ebeMultiply(sbeta[t]);
+			
+			// print gamma for this locus
+			scribe.print_mL_post(t, gamma);
 	
+		}
+		
+		
+		
+		
+		ofile.flush(); ofile.close();
+		System.out.println("\n <--> FB algorithm: " + Double.toString((System.nanoTime() - stime)/1000000000.) + " seconds\n");
+		System.out.println("LL="+posteriorLL+"\n");
+		
+	}
+
 	
-	
+	private class mL_scribe{
+		FileWriter printer;
+		int mlsize;
+		
+		mL_scribe(FileWriter fw, int ml_s){
+			printer = fw;
+			mlsize = ml_s;
+		}
+		
+		void print_mL_post(int mL_num, RealVector post_dist) throws IOException {
+			int middle_base_pos =  (int) ( (mL_num + 0.5) * mlsize );
+			
+			// print as a line in the file, using the avg position, and the avg posterior over stack
+			printer.append(middle_base_pos+"");
+			for(int i = 0 ; i < post_dist.getDimension(); i++) {
+				printer.append(", " + post_dist.getEntry(i));
+			}
+			printer.append(" \n ");
+
+		}
+	}
 	
 	
 	

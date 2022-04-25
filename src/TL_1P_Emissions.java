@@ -232,17 +232,17 @@ public class TL_1P_Emissions  extends EmissionsComputer{
 	void updateDemoFromPs(double[][] params) {
 
 		coalescence_rate.updateFromParams(params[0]);
-		mutation_rate = params[1][0];
+		mutation_rate = params[2][0];
 		
 		upToDate = false;
 	}
 
 	@Override
 	double[][] getPsFromDemo() {
-		double[][] out = new double[2][];
+		double[][] out = new double[3][];
 		
 		out[0] = coalescence_rate.getFunctionParameters();
-		out[1] = new double[] {mutation_rate};
+		out[2] = new double[] {mutation_rate};
 		
 		return out;
 	}

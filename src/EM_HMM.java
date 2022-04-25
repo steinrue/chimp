@@ -1,8 +1,13 @@
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.Set;
+
 import org.apache.commons.math3.analysis.MultivariateFunction;
 import org.apache.commons.math3.exception.DimensionMismatchException;
 import org.apache.commons.math3.exception.MathUnsupportedOperationException;
@@ -36,18 +41,21 @@ public abstract class EM_HMM {
 
 	
 	// Number of Samples
-	int num_samples;
+	int[] num_samples; // list of all n_s values in the data we will be looking at. for pseudohaps this is # of pseudohaps, NOT 2*n (ie, not model_n)
 	
 	// HMMs used. 
 	protected HMmodel hmm_model;  // current state of the EM process
 	private HMmodel calc_hmm;   // a dummy model used for maximization computations
 	
-	
-	// Simplex parameters
-	private SimplexOptimizer opt;
-	private NelderMeadSimplex n_m_s;
+	// regularization coefficients
 	private RealVector regularization_coefficients = new ArrayRealVector(4);
 	
+	
+	//counter tracking number of EM steps
+	int em_iter; 
+	
+	//optimizer
+	FlexibleOptimizer optim; 
 	
 	// data Handler
 	Helper.dataStreamsHandler dataStreams = null;
@@ -57,9 +65,10 @@ public abstract class EM_HMM {
 	
 
 	
-	// Output holders for FB algorithm aggregated over all the chromosomes/subsampling iterations
+	// Output holders for FB algorithm aggregated over all the chromosomes/subsampling iterations. 
+	// expectations for each n_s model are different entry in map (each entry is array of {transExp, emitExp, startExp} )
 	boolean fb_output_upToDate;
-	RealMatrix[] current_expectation_matrices = null;
+	AbstractMap<Integer,RealMatrix[]> current_expectation_matrices = new HashMap<Integer,RealMatrix[]>();
 	double current_ll = -1;
 	
 	// fields for printing log file //
@@ -76,17 +85,14 @@ public abstract class EM_HMM {
 	////////////////////////////////////////////////////////////////////////////////////////////
 	
 	
-	EM_HMM(FunctionUnivariate cr, double rr, double mr, int ns, double[] ts, String genealogy_rep, int mL_size,int[] additional_params, boolean binary_emission, boolean pseudo){
+	EM_HMM(FunctionUnivariate cr, double rr, double mr, int[] ns, AbstractMap<Integer,double[]> partitions, String genealogy_rep, int mL_size,int[] additional_params, boolean binary_emission, boolean pseudo){
 		num_samples = ns;
 		metaLocus_size = mL_size;
 		
 		
 		//initialize hmm models with the appropriate parameters
-		hmm_model = new HMmodel(cr, rr, mr, ns, ts, genealogy_rep, additional_params, binary_emission, pseudo); 
-		calc_hmm = new HMmodel(cr, rr, mr, ns, ts, genealogy_rep, additional_params, binary_emission, pseudo);
-
-		// initialize optimizer with basic accuracy params
-		opt = new SimplexOptimizer(.0000001, .0000001); 
+		hmm_model = new HMmodel(cr, rr, mr, ns, partitions, genealogy_rep, additional_params, binary_emission, pseudo); 
+		calc_hmm = new HMmodel(cr, rr, mr, ns, partitions, genealogy_rep, additional_params, binary_emission, pseudo);
 		
 		// check switch for printing optimization log, and create file if needed.
 		if(print_log) {
@@ -113,8 +119,12 @@ public abstract class EM_HMM {
 	///// METHODS WE CALL FROM OTHER PROGRAMS/FILES /////
 	///////////////////////////////////////////////////////////////////////////////
 	
-	RealVector get_SD() {
-		return hmm_model.getSS();
+	void print_marginals() {
+		
+		for(int i = 0 ; i < num_samples.length; i++) {
+			int t_ns = num_samples[i];
+			System.out.println("Marginal for n_s = " + t_ns+ " -> "+ hmm_model.getSS(t_ns));
+		}		
 	}
 
 	double[] get_current_params() {
@@ -133,102 +143,49 @@ public abstract class EM_HMM {
 		
 		dataStreams = dssHandler;
 		this.fb_clear_output();
-		
+		em_iter = 0;
 	}
 	
 	
 	// Perform E step and M step and update. 
 	void em_single_update(int m_step_eval_limit, double simplex_span, int simplex_type) {
 		
-		// redirect to Powell Optimizer right off the bat if simplex type specifies to
-		if(simplex_type == 5) {
-			em_single_update_Powell( m_step_eval_limit, simplex_span);
-			return;
-		}
-		
-		
-		double stime = System.nanoTime();
 		System.out.println("\n ----------------- Begin EM --------------------");
-		
+		em_iter++;
 		// E- STEP ////////////////////////////////////////
 		///////////////////////
+		
 		// perform forward backwards only if we havent already
 		if(!fb_output_upToDate) {this.fb_overAllData();}
-
-		// get expectations 
+		// gets expectations, and updates  current_expectation_matrices
 		
-		RealMatrix transExp = this.current_expectation_matrices[0];  
-		RealMatrix emitExp = this.current_expectation_matrices[1]; ;	
-		RealVector startExp = this.current_expectation_matrices[2].getColumnVector(0);
-		
-		
+				
 		// M- STEP ////////////////////////////////////////
 		///////////////////////
-		
-		// Prepare the optimization parameters. The objective function (to be maxed), initial guess, & n_m_s
-		ObjectiveFunction llFunction = new ObjectiveFunction(  new Q_Function(transExp, emitExp, startExp, dataStreams.getFSS(), calc_hmm) );
-		// next either pick simplex initialization point. 
-		InitialGuess iG = new InitialGuess(params_From_Hmm(hmm_model));
-		// initialize simplex
-		n_m_s = new nelderMeadSimplex_custom(simplex_type, simplex_span, iG.getInitialGuess().length, llFunction.getObjectiveFunction() ); // start_config, rho, khi , gamma, sigma
+		double stime = System.nanoTime();
 
-		// PERFORM OPTIMIZATION (most of params for this are written into opt already in the initialization call
-		PointValuePair pvp;
-		try { pvp = opt.optimize(new MaxIter(10000), new MaxEval(m_step_eval_limit) , n_m_s , GoalType.MAXIMIZE, iG ,llFunction);;}
-		catch(Exception TooManyEvaluationsException) { 	pvp = n_m_s.getPoint(0); }
+		
+		// Prepare the optimization parameters. The objective function (to be maxed) and initial guess
+		
+		Q_Function q_f =  new Q_Function(current_expectation_matrices, calc_hmm);
+		double[] initial_guess = params_From_Hmm(hmm_model);
+		
+		// READY OPTIMIZER
+		optim = new FlexibleOptimizer(simplex_type, simplex_span, m_step_eval_limit, q_f);
+
+		// PERFORM OPTIMIZATION 
+		double[] updated_vals = optim.maximize(initial_guess, em_iter);
+		
 		
 		// UPDATE HMM using the params obtained from optimization ( exponentiate if needed)
-		params_To_HMM(pvp.getPoint(), hmm_model); 	// update smc appropriately from the optimized params
+		params_To_HMM(updated_vals, hmm_model); 	// update smc appropriately from the optimized params
 		this.fb_clear_output(); // resetting params in hmm_model means fb algorithm outputs are no longer up to date
 		
-		System.out.println("\n \n**************************\n \n EM step time: " + Double.toString((System.nanoTime() - stime)/1000000000.) +"\n\n ***************************** \n\n");
-
+		System.out.println("\n \n**************************\n \n M step time: " + Double.toString((System.nanoTime() - stime)/1000000000.) +" seconds \n\n ***************************** \n\n");
 		System.gc();
 	}
 
-	void em_single_update_Powell(int m_step_eval_limit, double simplex_span) {
-		
-		double stime = System.nanoTime();
-		System.out.println("\n ----------------- Begin EM --------------------");
-		
-		// E- STEP ////////////////////////////////////////
-		///////////////////////
-		// perform forward backwards only if we havent already
-		if(!fb_output_upToDate) {this.fb_overAllData();}
-
-		// get expectations 
-		
-		RealMatrix transExp = this.current_expectation_matrices[0];  
-		RealMatrix emitExp = this.current_expectation_matrices[1]; ;	
-		RealVector startExp = this.current_expectation_matrices[2].getColumnVector(0);
-		
-		
-		// M- STEP ////////////////////////////////////////
-		///////////////////////
-		
-		// Prepare the optimization parameters. The objective function (to be maxed), initial guess, & n_m_s
-		Q_Function qref = new Q_Function(transExp, emitExp, startExp, dataStreams.getFSS(), calc_hmm);
-		ObjectiveFunction llFunction = new ObjectiveFunction(  qref );
-		// next either pick simplex initialization point. 
-		InitialGuess iG = new InitialGuess(params_From_Hmm(hmm_model));
-		// initialize simplex
-		//n_m_s = new nelderMeadSimplex_custom(simplex_type, simplex_span, iG.getInitialGuess().length, llFunction.getObjectiveFunction() ); // start_config, rho, khi , gamma, sigma
-		
-		
-		// PERFORM OPTIMIZATION (most of params for this are written into opt already in the initialization call
-		PointValuePair pvp; 
-		PowellOptimizer_custom optPP = new PowellOptimizer_custom(.0000001, .0000001); optPP.step_size_specify(simplex_span);
-		try { pvp = optPP.optimize(new MaxIter(10000), new MaxEval(m_step_eval_limit) , GoalType.MAXIMIZE, iG ,llFunction);;}
-		catch(Exception TooManyEvaluationsException) { 	pvp = qref.best_eval; } // need to obtain best value from the record in the Q-function itself
-		
-		// UPDATE HMM using the params obtained from optimization ( exponentiate if needed)
-		params_To_HMM(pvp.getPoint(), hmm_model); 	// update smc appropriately from the optimized params
-		this.fb_clear_output(); // resetting params in hmm_model means fb algorithm outputs are no longer up to date
-		
-		System.out.println("\n \n**************************\n \n EM step time: " + Double.toString((System.nanoTime() - stime)/1000000000.) +"\n\n ***************************** \n\n");
-
-	}
-
+	
 	double get_posteriorLL() {
 		
 		if (!fb_output_upToDate) { 
@@ -259,50 +216,66 @@ public abstract class EM_HMM {
 	// clears the forward backwards algorithm information (most recent expectation matrices and the most recent LL)
 	private void fb_clear_output() {
 		fb_output_upToDate = false;
-		current_expectation_matrices = null;
-		current_ll = -1;	
+		current_expectation_matrices.clear();
+		current_ll = -1;
 	}
 
 	// performs forward backwards using the Current model_hmm values and the data loaded in currently //
 	// does this from RAM or Files depending on streams_in_mem boolean
-	// after fb writes the ouput expectation matrices and ll to the appropriate holders
+	// after fb, writes the ouput expectation matrices and ll to the appropriate holders
 	
 	protected void fb_overAllData() {
 		
 		// make sure data is loaded appropriately
 		if( dataStreams == null ) {System.out.println("No Data Loaded for EM_HMM"); System.exit(0);}
 				
-		int num_streams = dataStreams.num_streams;
-		
-			
-		double totalLL = 0 ;
-		RealMatrix transExp = new Array2DRowRealMatrix(hmm_model.getTProbs().getRowDimension(),hmm_model.getTProbs().getColumnDimension());  
-		RealMatrix emitExp = new Array2DRowRealMatrix(hmm_model.getEProbs().getRowDimension(), hmm_model.getEProbs().getColumnDimension()); ;	
-		RealVector startExp = new ArrayRealVector(hmm_model.num_states);
+		double stime = System.nanoTime();
 
+		// clear all values, so expectations+likelihoods are counted from scratch
+		current_expectation_matrices.clear();		
+		double totalLL = 0 ;
 		
-		ExpectationsComputer exp_computer = new Expectation_FBskip(hmm_model.getTProbs(), hmm_model.getEProbs(), hmm_model.getSS());
 		
-		for(int f = 0 ; f < num_streams; f++) {
+		for(int f = 0 ; f < dataStreams.num_streams; f++) {
 			
+			// get the stream and its associated n_s value
+			int n_s = dataStreams.get_ns(f);
 			int[][] dstream = dataStreams.getStream(f);
 			
+			// if n_s is a new value, initialize it.
+			if(!current_expectation_matrices.containsKey(n_s)) {
+				int[] mat_dims = new int[] {hmm_model.getTProbs(n_s).getRowDimension(),hmm_model.getEProbs(n_s).getColumnDimension()};
+				
+				RealMatrix tE = new Array2DRowRealMatrix(mat_dims[0],mat_dims[0]);  
+				RealMatrix eE = new Array2DRowRealMatrix(mat_dims[0],mat_dims[1]); 	
+				RealMatrix sE = new Array2DRowRealMatrix(1,mat_dims[0]);
+				
+				current_expectation_matrices.put(n_s, new RealMatrix[] {tE,eE,sE});
+			}
+			
+			// compute expectations for this stream only
+			ExpectationsComputer exp_computer = new Expectation_FBskip(hmm_model.getTProbs(n_s), hmm_model.getEProbs(n_s), hmm_model.getSS(n_s));
 			exp_computer.loadDataFromStream(dstream, metaLocus_size);
 			exp_computer.computeExps();
-
-			// add on the expected number of transitions, emissions, and residences for each file
-			transExp = exp_computer.getExpT().add(transExp);  
-			emitExp = exp_computer.getExpE().add(emitExp);	
-			startExp = exp_computer.getExpS().add(startExp);
+			
+			// add the expectations to the total for the appropriate n_s
+			RealMatrix[] temp = current_expectation_matrices.get(n_s);
+			temp[0] = temp[0].add(exp_computer.getExpT());
+			temp[1] = temp[1].add(exp_computer.getExpE());
+			temp[2].setRowVector(0, temp[2].getRowVector(0).add(exp_computer.getExpS()));
+			
+			current_expectation_matrices.put(n_s, temp);
 			
 			totalLL = totalLL + exp_computer.get_LL();
 			
 		}
 		
-		current_expectation_matrices = new RealMatrix[] {transExp, emitExp, new Array2DRowRealMatrix(startExp.toArray())};
 		current_ll = totalLL;
 		
 		fb_output_upToDate = true;
+		
+		System.out.println("\n \n**************************\n \n E step time: " + Double.toString((System.nanoTime() - stime)/1000000000.) +" seconds \n\n ***************************** \n\n");
+
 	}
 
 	
@@ -313,52 +286,78 @@ public abstract class EM_HMM {
 
 	
 	class HMmodel {
+		
 		private boolean binary_emission;
 		private boolean pseudohap;
-		private TransitionsComputer tPcomp;
-		private EmissionsComputer ePcomp;
-		
-		private RealMatrix transProbs; // trans prob per metalocus (TP per locus raised to mlsize power)
-		private RealMatrix emitProbs;
-		private RealVector ssDistro;
-		
-		public int num_states;
-		public int num_emissions;
 				
-		HMmodel(FunctionUnivariate cr, double rr, double mr, int n, double[] ts, String genealogy_rep, int[] additional_params, boolean bin_em, boolean pseudo){
+		// we need a separate computer for each ns value, ns is key in map
+		private AbstractMap<Integer,TransitionsComputer> tPcomp;
+		private AbstractMap<Integer,EmissionsComputer> ePcomp;
+		
+		// we compute one of each type of matrix for each value of ns. ns is the key in following maps
+		private AbstractMap<Integer,RealMatrix> transProbs; // trans prob per metalocus (TP per locus raised to mlsize power)
+		private AbstractMap<Integer,RealMatrix> emitProbs;
+		private AbstractMap<Integer,RealVector> ssDistro;
+		
+				
+		private double[][] demo_ps; //current demographic parameters
+		
+		HMmodel(FunctionUnivariate cr, double rr, double mr, int[] ns, AbstractMap<Integer,double[]> ts, String genealogy_rep, int[] additional_params, boolean bin_em, boolean pseudo){
 			
 			binary_emission = bin_em;
 			pseudohap = pseudo;
-			int model_n = pseudohap ? 2 * n : n ;
 			
-			if(genealogy_rep.equals("TH_1P")) {
-				if(additional_params != null) {System.out.print("Invalid additional params"); System.exit(0);}
-				tPcomp = new TH_1P_Transitions(cr, rr, model_n, ts);
-				ePcomp = new TH_1P_Emissions(cr, mr, model_n, ts, pseudohap);
-			}
+			int[] keys = num_samples;
 			
-			if(genealogy_rep.equals("TL_1P")) {
-				int[] ap = additional_params;
+			// initialize all the map holders
+			tPcomp = new HashMap<Integer, TransitionsComputer>();
+			ePcomp = new HashMap<Integer, EmissionsComputer>();
+			transProbs = new HashMap<Integer, RealMatrix>();
+			emitProbs = new HashMap<Integer, RealMatrix>();
+			ssDistro = new HashMap<Integer, RealVector>();
 
-				if(additional_params.length == 2) { tPcomp = new TL_1P_Transitions(cr, rr, model_n, ts, ap[1]); }
-				else if(additional_params.length == 3) { tPcomp = new TL_1P_Transitions(cr, rr, model_n, ts, new int[] {ap[1],ap[2]}); }
-				else {System.out.print("Invalid additional params"); System.exit(0);}
+			
+			// go through each key, create tP, eP computers for each
+			for(int i = 0 ; i < keys.length ; i++) {
+				int n_s = keys[i]; // num of haplotypes in tree for model
+				int model_n = n_s * (pseudo ? 2 : 1);
 				
-				ePcomp = new TL_1P_Emissions(cr, mr, model_n, ts, ap[0], pseudohap);
+//				if(genealogy_rep.equals("TH_1P")) {
+				// can we hack this in here?
+				if(genealogy_rep.equals("TH_1P") || (model_n == 2)) {
+//					if(additional_params != null) {System.out.print("Invalid additional params"); System.exit(0);}
+					if (genealogy_rep.equals("TH_1P") && (additional_params != null)) {
+						System.out.print("Invalid additional params"); System.exit(-1);
+					}
+					tPcomp.put(n_s, new TH_1P_Transitions(cr, rr, model_n, ts.get(n_s)));
+					ePcomp.put(n_s, new TH_1P_Emissions(cr, mr, model_n, ts.get(n_s), pseudohap));
+				}
+				
+				else if (genealogy_rep.equals("TL_1P")) {
+					int[] ap = additional_params;
+
+					if(additional_params.length == 2) { tPcomp.put(n_s, new TL_1P_Transitions(cr, rr, model_n, ts.get(n_s), ap[1])); }
+					else if(additional_params.length == 3) { tPcomp.put(n_s, new TL_1P_Transitions(cr, rr, model_n, ts.get(n_s), new int[] {ap[1],ap[2]})); }
+					else {System.out.print("Invalid additional params"); System.exit(0);}
+					
+					ePcomp.put(n_s, new TL_1P_Emissions(cr, mr, model_n, ts.get(n_s), ap[0], pseudohap));
+
+				}
+				
+				else {System.out.println("Need a genealogy representation specified"); System.exit(0);}
+				
+				
+				int mls = metaLocus_size;
+				transProbs.put(n_s, tPcomp.get(n_s).transitionProbs().power(mls)); // metalocus exponentiation
+				emitProbs.put(n_s, ePcomp.get(n_s).emissionProbs(binary_emission));
+				ssDistro.put(n_s, ePcomp.get(n_s).getMargPDF()); // obtain the initial distro from pdf
 
 			}
 			
 			
-
-			int mls = metaLocus_size;
-			transProbs = tPcomp.transitionProbs().power(mls); // metalocus exponentiation
-			
-			emitProbs = ePcomp.emissionProbs(binary_emission);
-			ssDistro = ePcomp.getMargPDF(); // obtain the initial distro from pdf
-			
-			
-			num_states = ssDistro.getDimension();
-			num_emissions = emitProbs.getColumnDimension();
+			// initialize demography
+			demo_ps = tPcomp.get(num_samples[0]).getPsFromDemo(); // pulls the vals that were fed to the trans computer. missing mutation still
+			demo_ps[2] = ePcomp.get(num_samples[0]).getPsFromDemo()[2]; // pulls mutation rate from emission computer
 			
 		}
 		
@@ -367,48 +366,55 @@ public abstract class EM_HMM {
 		// ACCESS METHODS 
 		
 		// update the split time. pick new split time, compute emission and transition probs and write it in 
-		void updateDemography(double[][] trans_params, double[][] emit_params) {
+		void updateDemography(double[][] dem_params) {
 			
 			// params is list of params. 
 			// index 0 is the params needed to update the coalescence_rates in each
 			// index 1 is the rr, and index 2 is the mr
 			
-			tPcomp.updateDemoFromPs(trans_params);
-			ePcomp.updateDemoFromPs(emit_params);
+			demo_ps = dem_params.clone();
+						
+			int[] keys = num_samples;
 			
+			for(int i = 0 ; i < keys.length; i++) {
+				int key = keys[i];
+				tPcomp.get(key).updateDemoFromPs(demo_ps);
+				ePcomp.get(key).updateDemoFromPs(demo_ps);
+				System.out.println("-----------------------");
+				
+				int mls = metaLocus_size;
+				transProbs.put(key, tPcomp.get(key).transitionProbs().power(mls));
+				emitProbs.put(key, ePcomp.get(key).emissionProbs(binary_emission));	
+				ssDistro.put(key, ePcomp.get(key).getMargPDF()) ;
+			}
+
 			System.out.println("-----------------------");
 			System.out.println("-----------------------");
-
-		
-			int mls = metaLocus_size;
-			transProbs = tPcomp.transitionProbs().power(mls);
 			
-			emitProbs = ePcomp.emissionProbs(binary_emission);	
-			ssDistro = ePcomp.getMargPDF();
+		
+
+
+
 			
 
 			
 		}
 		
-		double[][][] getDemoParams(){
-			double[][][] out = new double[2][][];
-			out[0] = tPcomp.getPsFromDemo();
-			out[1] = ePcomp.getPsFromDemo();
+		double[][] getDemoParams(){
+			return demo_ps;
+		}
+		
+		RealMatrix getTProbs(int ns) {
 			
-			return out;
+			return transProbs.get(ns).copy();
 		}
 		
-		RealMatrix getTProbs() {
-			
-			return transProbs.copy();
+		RealMatrix getEProbs(int ns) {
+			return emitProbs.get(ns).copy();
 		}
 		
-		RealMatrix getEProbs() {
-			return emitProbs.copy();
-		}
-		
-		RealVector getSS() {
-			return ssDistro.copy();
+		RealVector getSS(int ns) {
+			return ssDistro.get(ns).copy();
 		}
 		
 		RealVector getRegularization(double estimated_cr) {
@@ -416,11 +422,12 @@ public abstract class EM_HMM {
 			// [d0l2, d1l1, d1l2, d2l2]
 			
 			RealVector out = new ArrayRealVector(4);
+			FunctionUnivariate t_crate = tPcomp.get(tPcomp.keySet().toArray()[0]).coalescence_rate;
 			
-			out.setEntry(0, tPcomp.coalescence_rate.reg_d0l2(estimated_cr));
-			out.setEntry(1, tPcomp.coalescence_rate.reg_d1l1());
-			out.setEntry(2, tPcomp.coalescence_rate.reg_d1l2());
-			out.setEntry(3, tPcomp.coalescence_rate.reg_d2l2());
+			out.setEntry(0, t_crate.reg_d0l2(estimated_cr));
+			out.setEntry(1, t_crate.reg_d1l1());
+			out.setEntry(2, t_crate.reg_d1l2());
+			out.setEntry(3, t_crate.reg_d2l2());
 
 			return out;
 		}
@@ -432,21 +439,18 @@ public abstract class EM_HMM {
 		
 		PointValuePair best_eval = new PointValuePair(new double[] {}, Double.NEGATIVE_INFINITY);		
 		
-		private RealMatrix transX0;
-		private RealMatrix emitX0;
-		private RealVector startX0;
+		AbstractMap<Integer,RealMatrix[]> tesX0; // all the transitions, emissions, starts, expectations for all the different n_s values used
+
 		private HMmodel hmC;
 				
 		private double e_CR; // estimated effective coalescent rate from Wattersons estimator
 		
-		Q_Function(RealMatrix tX, RealMatrix eX, RealVector sX, double eNe, HMmodel hm){
-				transX0 = tX;
-				emitX0 = eX;
-				startX0 = sX;
+		Q_Function(AbstractMap<Integer,RealMatrix[]> x0, HMmodel hm){
+				tesX0 = x0;
+
 				hmC = hm;
-								
-				e_CR = helper.estimate_watersons_CR(dataStreams.getFSS(), num_samples,  hm.getDemoParams()[1][1][0]);
-				
+					
+				e_CR = hm.getDemoParams()[2][0] / dataStreams.get_Watterson();				
 		}
 				
 		public double value(double[] log_args) {
@@ -457,82 +461,93 @@ public abstract class EM_HMM {
 					
 					System.out.println("#PARAMS: " + Arrays.toString(log_args));
 
-
-					RealMatrix tP = hmC.getTProbs();
-					RealMatrix eP = hmC.getEProbs();
-					RealVector sP = hmC.getSS();
-
-					///// do a dimension check /////
-					if(eP.getColumnDimension() != emitX0.getColumnDimension() || eP.getRowDimension() != emitX0.getRowDimension()) {
-						System.out.println("expectation-prob matrix dimension mismatch."); System.exit(0);
-					}
-					if(tP.getColumnDimension() != transX0.getColumnDimension() || tP.getRowDimension() != transX0.getRowDimension()) {
-						System.out.println("expectation-prob matrix dimension mismatch."); System.exit(0);
-					}
+					double total_ll = 0;
 					
-					
-					
-					double a = 0;
-					double b = 0;
-					double c = 0;
-					
-					// add the transition contributions
-					for(int i = 0 ; i < tP.getRowDimension(); i++) {
-						for(int j = 0 ; j < tP.getColumnDimension() ; j++) {
-							if(transX0.getEntry(i, j) > 0. && tP.getEntry(i, j) > 0.) { a = a + Math.log(tP.getEntry(i, j))*(transX0.getEntry(i, j));}
+					for(int key = 0 ; key < num_samples.length ; key++) {
+						int n_s = num_samples[key]; // iterate over each n_s value
+						
+						// these are hmm probs for the given n_s value
+						RealMatrix tP = hmC.getTProbs(n_s);
+						RealMatrix eP = hmC.getEProbs(n_s);
+						RealVector sP = hmC.getSS(n_s);
+						
+						
+						RealMatrix[] expectations = tesX0.get(n_s);
+						RealMatrix tX = expectations[0];
+						RealMatrix eX = expectations[1];
+						RealVector sX = expectations[2].getRowVector(0);
+						
+						
+						double ll_ns = 0;
+						
+						// add the transition contributions
+						for(int i = 0 ; i < tP.getRowDimension(); i++) {
+							for(int j = 0 ; j < tP.getColumnDimension() ; j++) {
+								if(tX.getEntry(i, j) > 0. && tP.getEntry(i, j) > 0.) {ll_ns = ll_ns + Math.log(tP.getEntry(i, j))*(tX.getEntry(i, j));}
+							}
 						}
-					}
-					// add the emission contributions.
-					for(int i = 0 ; i < eP.getRowDimension(); i++) {
-						for(int j = 0 ; j < eP.getColumnDimension() ; j++) {
-							if(emitX0.getEntry(i, j) > 0. && eP.getEntry(i, j) > 0.) { b = b + Math.log(eP.getEntry(i, j))*(emitX0.getEntry(i, j)); }
+						
+						// add the emission contributions.
+						for(int i = 0 ; i < eP.getRowDimension(); i++) {
+							for(int j = 0 ; j < eP.getColumnDimension() ; j++) {
+								if(eX.getEntry(i, j) > 0. && eP.getEntry(i, j) > 0.) { ll_ns = ll_ns + Math.log(eP.getEntry(i, j))*(eX.getEntry(i, j)); }
+							}
 						}
+						
+						// add initial distro contribution
+						for(int i = 0 ; i < sP.getDimension() ; i++) {
+							if(sX.getEntry(i) > 0. && sP.getEntry(i) > 0.) { ll_ns = ll_ns + Math.log(sP.getEntry(i))*(sX.getEntry(i));}
+						}
+						
+						// ll_ns is the contribution of this n_s's trans, emit, start matrices to the log likelihood
+						
+						total_ll = total_ll + ll_ns;
 					}
-					// add initial distro contribution
-					for(int i = 0 ; i < sP.getDimension() ; i++) {
-						if(startX0.getEntry(i) > 0. && sP.getEntry(i) > 0.) { c = c + Math.log(sP.getEntry(i))*(startX0.getEntry(i));}
-					}
-					double tt = a+b+c;
 					
+					// total_ll is ll aggregate over all three matrices for each n_s value
+					 
 					
-					if(tt == 0.0) {
+					if(total_ll == 0.0) {
 						System.out.println("-- Warning, Q-function forced value --");
-						tt = Double.NEGATIVE_INFINITY;
+						total_ll = Double.NEGATIVE_INFINITY;
 					}
+					
+					// take care of regularization contribution
 					RealVector reg_qs = hmC.getRegularization(e_CR);
-					System.out.println("(Q_eval:"+tt +" ; Reg:"+ reg_qs+")");
 					
+					// Scale reg by total genetic length across all streams.
+					reg_qs.mapMultiplyToSelf(dataStreams.getGenLen());
 					
-					if(print_log) { try{scribe.append(tt + ", ");
+					System.out.println("(Q_eval:"+total_ll +" ; Reg:"+ reg_qs+")");
+					
+					if(print_log) { try{scribe.append(total_ll + ", ");
 						double[] tarr = helper.ebeExp(log_args);
 						for(int ii = 0 ; ii < tarr.length;ii++) {
 							scribe.append(tarr[ii] + ", ");
 						} scribe.append("\n");
 					}catch (IOException e){;}}
 					
+				
+					double 	qval = total_ll - regularization_coefficients.dotProduct(reg_qs);
 					
-					
-					
-					double 	qval = tt - regularization_coefficients.dotProduct(reg_qs);
-					
+					System.out.println("(Q_eval (adjusted):"+qval+")");
+
 					// keep record of the best evaluation for this Q-function
 					if(qval > best_eval.getValue()) { best_eval = new PointValuePair(log_args, qval);}
 					
 					return qval;
 		}
-					
-
+		
 	}
 	
 	
-	
-	private class nelderMeadSimplex_custom extends NelderMeadSimplex{
+	private class ApacheNelderMeadSimplex_custom extends NelderMeadSimplex{
 		
 		double simplex_initialization_scale;
 		int simplex_type;
 		MultivariateFunction qfunc_sbuild;
 		
-		public nelderMeadSimplex_custom( int s_type, double s_step, int space_dim, MultivariateFunction q){
+		public ApacheNelderMeadSimplex_custom( int s_type, double s_step, int space_dim, MultivariateFunction q){
 			super(space_dim);
 			simplex_type = s_type;
 			simplex_initialization_scale = s_step;
@@ -911,284 +926,75 @@ public abstract class EM_HMM {
 
 	}
 
+	private class FlexibleOptimizer {
 		
-	public class PowellOptimizer_custom  extends MultivariateOptimizer {
-	    
-		// Code was copy-pasted from apache library, but then tweaked to allow for the simplex size to be specified
-		// this tweak is in definition of step_size field, and is used in doOptimize() method
+		int optimizer_type; // type of optimizer/simplex
+		double optimizer_scale; // the scale at which the optimizer is initialized (related to step size)
+		int max_m_evals; // max function evals allowed in optimizing 
+		MultivariateFunction q_function; // q-function
 		
 		
-	    //Minimum relative tolerance.
-	    private final double MIN_RELATIVE_TOLERANCE = 2 * FastMath.ulp(1d);
-	    
-	    // Relative threshold.
-	    private final double relativeThreshold;
-	    
-	    // Absolute threshold.
-	    private final double absoluteThreshold;
-	    
-	    // Line search.
-	    private final LineSearch line;
-	
-	    // initial step size = 1.
-	    private double step_size = Double.NaN;
-	    
-	    
-	    public PowellOptimizer_custom(double rel, double abs, ConvergenceChecker<PointValuePair> checker) {
-	        this(rel, abs, FastMath.sqrt(rel), FastMath.sqrt(abs), checker);
-	    }
-	
-	    public PowellOptimizer_custom(double rel, double abs, double lineRel, double lineAbs,ConvergenceChecker<PointValuePair> checker) {
-	        super(checker);
-	
-	        if (rel < MIN_RELATIVE_TOLERANCE) {
-	            throw new NumberIsTooSmallException(rel, MIN_RELATIVE_TOLERANCE, true);
-	        }
-	        if (abs <= 0) {
-	            throw new NotStrictlyPositiveException(abs);
-	        }
-	        relativeThreshold = rel;
-	        absoluteThreshold = abs;
-	
-	        // Create the line search optimizer.
-	        line = new LineSearch(this, lineRel, lineAbs, 1d);
-	       
-	    }
-	
-	    public PowellOptimizer_custom(double rel, double abs) {
-	        this(rel, abs, null);
-	    }
-	
-	    public PowellOptimizer_custom(double rel, double abs, double lineRel, double lineAbs) {
-	        this(rel, abs, lineRel, lineAbs, null);
-	    }
-	
-	    /** {@inheritDoc} */
-	    @Override
-	    protected PointValuePair doOptimize() {
-	        //if(true) {return doOptimizeOriginal();}
-	    	
-	    	checkParameters();
-	
-	        final GoalType goal = getGoalType();
-	        final double[] guess = getStartPoint();
-	        final int n = guess.length;
-	
-	        final double[][] direc = new double[n][n];
-	        for (int i = 0; i < n; i++) {
-	            direc[i][i] = step_size;
-	        }
-	
-	        final ConvergenceChecker<PointValuePair> checker
-	            = getConvergenceChecker();
-	
-	        double[] x = guess;
-	        double fVal = computeObjectiveValue(x);
-	        double[] x1 = x.clone();
-	        while (true) {
-	            incrementIterationCount();
-	
-	            double fX = fVal;
-	            double fX2 = 0;
-	            double delta = 0;
-	            int bigInd = 0;
-	            double alphaMin = 0;
-	            
-	            for (int i = 0; i < n; i++) {
-	            	System.out.println("\n \n \n Unidirectional search in D"+i+" direction \n ");
-	            	
-	                final double[] d = MathArrays.copyOf(direc[i]);
-	
-	                fX2 = fVal;
-	
-	                final UnivariatePointValuePair optimum = line.search(x, d);
-	                fVal = optimum.getValue();
-	                alphaMin = optimum.getPoint();
-	                final double[][] result = newPointAndDirection(x, d, alphaMin);
-	                x = result[0];
-	
-	                if (FastMath.abs(fX2 - fVal) > delta) {
-	                    delta = fX2 - fVal;
-	                    bigInd = i;
-	                }
-	            }
-	
-	            // Default convergence check.
-	            boolean stop = 2 * FastMath.abs(fX - fVal) <= 
-	                (relativeThreshold * (FastMath.abs(fX) + FastMath.abs(fVal)) +
-	                 absoluteThreshold);   
-	
-	            final PointValuePair previous = new PointValuePair(x1, fX);
-	            final PointValuePair current = new PointValuePair(x, fVal);
-	            if (!stop && checker != null) { // User-defined stopping criteria.
-	                stop = checker.converged(getIterations(), previous, current);
-	            }
-	            if (stop) {
-	                if (goal == GoalType.MINIMIZE) {
-	                    return (fVal < fX) ? current : previous;
-	                } else {
-	                    return (fVal > fX) ? current : previous;
-	                }
-	            } 
-	
-	            final double[] d = new double[n];
-	            final double[] x2 = new double[n];
-	            for (int i = 0; i < n; i++) {
-	                d[i] = x[i] - x1[i];
-	                x2[i] = 2 * x[i] - x1[i];
-	            }
-	
-	            x1 = x.clone();
-	            fX2 = computeObjectiveValue(x2);
-	
-	            
-	            ///////// now optimize in aggregate direction, and replace biggest biggest contributor with aggregate.
+		public FlexibleOptimizer(int o_type, double s_size, int m_evals, MultivariateFunction q) {
+			optimizer_type = o_type;
+			optimizer_scale = s_size;
+			max_m_evals = m_evals;
+			q_function = q;
+		}
+		
+		public double[] maximize(double[] i_guess, int em_step) {
+		
+			// use apache nelder mead
+			//double[] out = apache_NM(i_guess);	
+			
+			// use Mike Hutt Nelder Mead
+			double[] out = MH_NM(i_guess);
+			
+			
+			return out;
+			
+		}
+		
+		
+		private double[] MH_NM(final double[] startPoint) {
+			
+			// define wrapper function of q-function since MHUTT_NM only minimizes, and we need to maximize
+			final class wrap_func implements MultivariateFunction
+			{	
+				@Override
+				public double value(double[] x){
+					return -q_function.value(x);
+				}
+			}		
+			
+			int nm_iters = 1000; // number of iterations for NM
+			double eps = .0000001; // precision for convergence criterion
+			
+			MHutt_NMSimplex nm_simplex = new MHutt_NMSimplex(nm_iters); // max_iter in NM opt.
+			PointValuePair pvp = nm_simplex.minimize(max_m_evals, startPoint, eps, optimizer_scale, new wrap_func(), optimizer_type);
+			return pvp.getPoint();
+		}
+		
+		private double[] apache_NM( final double[] startPoint){
+			
 
-		        System.out.println("\n \n \n Unidirectional search in D* direction \n ");
-	            final UnivariatePointValuePair optimum = line.search(x, d);
-	            fVal = optimum.getValue();
-	            alphaMin = optimum.getPoint();
-	            final double[][] result = newPointAndDirection(x, d, alphaMin);
-	            x = result[0];
-	
-	            final int lastInd = n - 1; // 
-	            direc[bigInd] = direc[lastInd];
-	            direc[lastInd] = result[1];
-	
-	        }
-	    }
-	
-	    protected PointValuePair doOptimizeOriginal() {
-	        // this is the original implementation with the minor modification to adjust initial step sizes. 
-	    	
-	    	checkParameters();
-	
-	        final GoalType goal = getGoalType();
-	        final double[] guess = getStartPoint();
-	        final int n = guess.length;
-	
-	        final double[][] direc = new double[n][n];
-	        for (int i = 0; i < n; i++) {
-	            direc[i][i] = step_size;
-	        }
-	
-	        final ConvergenceChecker<PointValuePair> checker
-	            = getConvergenceChecker();
-	
-	        double[] x = guess;
-	        double fVal = computeObjectiveValue(x);
-	        double[] x1 = x.clone();
-	        while (true) {
-	            incrementIterationCount();
-	
-	            double fX = fVal;
-	            double fX2 = 0;
-	            double delta = 0;
-	            int bigInd = 0;
-	            double alphaMin = 0;
-	            
-	            for (int i = 0; i < n; i++) {
-	            	System.out.println("\n \n \n Unidirectional search in D"+i+" direction \n ");
-	            	
-	                final double[] d = MathArrays.copyOf(direc[i]);
-	
-	                fX2 = fVal;
-	
-	                final UnivariatePointValuePair optimum = line.search(x, d);
-	                fVal = optimum.getValue();
-	                alphaMin = optimum.getPoint();
-	                final double[][] result = newPointAndDirection(x, d, alphaMin);
-	                x = result[0];
-	
-	                if ((fX2 - fVal) > delta) {/////////*************
-	                    delta = fX2 - fVal;
-	                    bigInd = i;
-	                }/////////*************
-	            }
-	
-	            // Default convergence check.
-	            boolean stop = 2 * (fX - fVal) <=      /////////*************
-	                (relativeThreshold * (FastMath.abs(fX) + FastMath.abs(fVal)) +
-	                 absoluteThreshold);   /////////*************
-	
-	            final PointValuePair previous = new PointValuePair(x1, fX);
-	            final PointValuePair current = new PointValuePair(x, fVal);
-	            if (!stop && checker != null) { // User-defined stopping criteria.
-	                stop = checker.converged(getIterations(), previous, current);
-	            }
-	            if (stop) {/////////*************
-	                if (goal == GoalType.MINIMIZE) {
-	                    return (fVal < fX) ? current : previous;
-	                } else {
-	                    return (fVal > fX) ? current : previous;
-	                }
-	            } /////////*************
-	
-	            final double[] d = new double[n];
-	            final double[] x2 = new double[n];
-	            for (int i = 0; i < n; i++) {
-	                d[i] = x[i] - x1[i];
-	                x2[i] = 2 * x[i] - x1[i];
-	            }
-	
-	            x1 = x.clone();
-	            fX2 = computeObjectiveValue(x2);
-	
-	            if (fX > fX2) {/////////*************
-	                double t = 2 * (fX + fX2 - 2 * fVal);
-	                double temp = fX - fVal - delta;
-	                t *= temp * temp;
-	                temp = fX - fX2;
-	                t -= delta * temp * temp;
-	        /////////*************
-	                if (t < 0.0) {
-		            	System.out.println("Unidirectional search in D"+n+" direction");
-	                    final UnivariatePointValuePair optimum = line.search(x, d);
-	                    fVal = optimum.getValue();
-	                    alphaMin = optimum.getPoint();
-	                    final double[][] result = newPointAndDirection(x, d, alphaMin);
-	                    x = result[0];
-	
-	                    final int lastInd = n - 1;
-	                    direc[bigInd] = direc[lastInd];
-	                    direc[lastInd] = result[1];
-	                }
-	            }
-	        }
-	    }
-	
-	    
-	    protected void step_size_specify(double new_ss) {
-	    	step_size = new_ss;
-	    }
-	    
-	    
-	    private double[][] newPointAndDirection(double[] p,
-	                                            double[] d,
-	                                            double optimum) {
-	        final int n = p.length;
-	        final double[] nP = new double[n];
-	        final double[] nD = new double[n];
-	        for (int i = 0; i < n; i++) {
-	            nD[i] = d[i] * optimum;
-	            nP[i] = p[i] + nD[i];
-	        }
-	
-	        final double[][] result = new double[2][];
-	        result[0] = nP;
-	        result[1] = nD;
-	
-	        return result;
-	    }
-	
-	    
-	    private void checkParameters() {
-	        if (getLowerBound() != null ||
-	            getUpperBound() != null) {
-	            throw new MathUnsupportedOperationException(LocalizedFormats.CONSTRAINT);
-	        }
-	    }
+			SimplexOptimizer opt = new SimplexOptimizer(.0000001, .0000001);
+			NelderMeadSimplex n_m_s = new ApacheNelderMeadSimplex_custom(optimizer_type, optimizer_scale, startPoint.length, q_function ); // start_config, rho, khi , gamma, sigma
+
+			// for apache optimizer need:
+			ObjectiveFunction llFunction = new ObjectiveFunction( q_function );
+			InitialGuess iG = new InitialGuess(startPoint);
+
+			
+			PointValuePair pvp;
+			try { pvp = opt.optimize(new MaxIter(10000), new MaxEval(max_m_evals) , n_m_s , GoalType.MAXIMIZE, iG ,llFunction);;}
+			catch(Exception TooManyEvaluationsException) { 	pvp = n_m_s.getPoint(0); }
+			
+			return pvp.getPoint();
+			
+		}
+		
 	}
+	
 	
 //////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////

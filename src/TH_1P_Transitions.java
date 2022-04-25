@@ -173,7 +173,7 @@ public class TH_1P_Transitions extends TransitionsComputer {
 
 	@Override
 	double[][] getPsFromDemo() {
-		double[][] out = new double[2][];
+		double[][] out = new double[3][];
 		
 		out[0] = coalescence_rate.getFunctionParameters();
 		out[1] = new double[] {recombination_rate};
@@ -244,13 +244,11 @@ public class TH_1P_Transitions extends TransitionsComputer {
 		int n_samples = 10;
 		
 		// initial value for psh
-		double psh0 = 17000; // to define states
+		double psh0 = 11559; // to define states
 		
 		/////// //////////////////////////////////////
-		//double[] pp = new double[] {.002,.002,.002,.002,.002,.002,.002,.002,.002,.002,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.1};
-		double[] pp = new double[] {.1,.1,.1,.1,.1,.1,.1,.1,.1,.1};
-
-		//double[] pp = new double[] {.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02,.02};
+		double[] pp = new ArrayRealVector(10,.1).toArray();
+		
 
 		RealVector dlengths = helper.getTreeHeightPartitions(pp, n_samples);
 		dlengths.mapMultiplyToSelf(psh0 * 2);
@@ -258,9 +256,9 @@ public class TH_1P_Transitions extends TransitionsComputer {
 		
 		double sfactor = 1000;
 		
-		double [] xs = helper.generate_log_discretization(56.501,56501, 12);
+		double [] xs = new double[] {57.0, 113.653, 226.614, 451.849, 900.95, 1796.417, 3581.90, 7142.002, 14240.539, 28394.411, 56616.017, 112887.476, 225087.931, 448806.0};
 		//double[] ys = new double[] {17000,17000,17000,17000,17000,17000,17000,17000,17000,17000,17000,17000}; 
-		double[] ys = new double[] {50000,17000,5000,17000,50000,17000,5000,17000,50000,17000,5000,5000,}; 
+		double[] ys = new double[] {50000, 15811, 5000, 15811, 50000, 15811, 5000, 15811,50000,15811,5000,15811,50000,15811,5000}; 
 
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		
@@ -286,8 +284,12 @@ public class TH_1P_Transitions extends TransitionsComputer {
 		System.out.println(dlengths);
 		System.out.println("\n \n **********");
 		System.out.println("************************");
-		System.out.println("NUMERIC JOINT PDF:");
+		System.out.println("NUMERIC JOINT CDF:");
+		System.out.println(tp_comp.getCDF());
+		System.out.println("************************");
+		System.out.println("\n \n NUMERIC JOINT PDF:");
 		System.out.println(tp_comp.getPDF());
+		System.out.println("************************");
 		System.out.println("\n \n NUMERIC TRANSITION PROBS:");
 		System.out.println(tp_comp.transitionProbs().power(1));
 		System.out.println("\n \n \n ************************");
@@ -298,7 +300,7 @@ public class TH_1P_Transitions extends TransitionsComputer {
 
 		System.out.println("************************");
 		RealMatrix trap = tp_comp.transitionProbs();
-		System.out.println(trap.power(1000000));
+		System.out.println(trap.power(500));
 
 	}
 

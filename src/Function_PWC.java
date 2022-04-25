@@ -1,6 +1,10 @@
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Scanner;
 
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.ArrayRealVector;
@@ -33,7 +37,7 @@ public class Function_PWC implements FunctionUnivariate {
 			discrete_fbins = domain.length;
 		}
 		else {
-			System.out.println("Invalid attempt to initialize Function_PWExp structure");
+			System.out.println("Invalid attempt to initialize Function_PWC structure");
 			System.exit(0);
 		}
 		
@@ -62,6 +66,77 @@ public class Function_PWC implements FunctionUnivariate {
 		for(int i = 0 ;i < function.length;i++) {function[i] = const_val;}
 		
 		discrete_fbins = domain.length;
+	}
+	
+	Function_PWC(String paramFile, boolean logx){
+		
+		// Fill holder structures with the data from the file going line by line
+		ArrayList<Double> rxs = new ArrayList<Double>(30);
+		ArrayList<Double> rys = new ArrayList<Double>(30);
+		double[] dom;
+		double[] vals;
+		
+		try {
+			
+			
+			// initialize scanners
+			Scanner scanner = new Scanner(new File(paramFile));
+			
+			// figure out how many columns this has, so we can create that many holder arraylists.
+			String first_line = scanner.nextLine();
+			
+
+			while(scanner.hasNextLine()) {
+				// write in one line at a time
+				Scanner line_scan = new Scanner(scanner.nextLine());  line_scan.useDelimiter("\\s*,\\s*");
+				// process the line
+				rxs.add(line_scan.nextDouble() );
+				rys.add(line_scan.nextDouble() );
+				
+				line_scan.close();
+			}
+						
+			scanner.close();
+					
+		} 
+		
+		catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.out.print("Could not read dataStream from the file"); System.exit(0);
+		}
+
+		
+		rxs.remove(0);
+		if (rxs.size() < 1) {System.err.print("Issue with .param File."); System.exit(0);}
+
+		dom = new double[rxs.size()];
+		vals = new double[rys.size()];
+		for(int i = 0 ; i < dom.length ; i++ ) {dom[i] = rxs.get(i); }
+		for(int i = 0 ; i < vals.length ; i++ ) {vals[i] = rys.get(i); }
+		
+		boolean valid = true;
+		
+		for(int i = 0 ; i < dom.length - 1 ;  i++) {
+			if(dom[i] > dom[i+1]) {valid = false;}
+		}
+		
+		if(dom.length != vals.length - 1) {valid = false;}
+		
+		
+		if(valid) {
+			function = vals.clone();
+			domain = dom.clone();
+			discrete_fbins = domain.length;
+		}
+		else {
+			System.out.println("Invalid attempt to initialize Function_PWC structure");
+			System.exit(0);
+		}
+		
+		lx_scale = logx;
+
+		
 	}
 	
 	
@@ -349,7 +424,7 @@ public class Function_PWC implements FunctionUnivariate {
 	@Override
 	public void updateFromParams(double[] params) {
 		if(params.length != function.length) {
-			System.out.println("Updating PWExp with incompatible params"); System.exit(0);
+			System.err.println("Updating PWC with incompatible params"); System.exit(0);
 		}
 		
 		/*
@@ -425,16 +500,14 @@ public class Function_PWC implements FunctionUnivariate {
 
 		Helper helper = new Helper();
 		
-		FunctionUnivariate fun = new Function_PWC(4,40,8,10000,false);
+		Function_PWC fun = new Function_PWC("/Users/gautam/Desktop/test/test.param",true);
 		//fun.updateFromParams(helper.ebeLog(new double[] {100,200,500,200,200,200,700,200,200,200}));
 		//fun.updateFromParams(helper.ebeLog(new double[] {100,200,300,300,500,600,700,800,900,1000}));
 		
-		System.out.println(Arrays.toString(fun.getDiscontinuities()));
-		System.out.println(Arrays.toString(helper.ebeExp(fun.getFunctionParameters())));
+		System.out.println(Arrays.toString(fun.domain));
+		System.out.println(Arrays.toString(fun.function));
 
-		System.out.println(fun.reg_d2l2());
-
-		fun.printReciprocalToFile("/Users/gautam/Desktop/scratch/fun_pwc", 10000);
+		
 		System.out.println("done");
 		
 		
