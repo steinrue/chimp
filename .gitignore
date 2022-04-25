@@ -28,3 +28,22 @@ lib/*.jar
 
 # and let's try to ignore the entire simulated data
 Simulation_Studies/data
+
+# and the output from the analysis and plotting
+Simulation_Studies/analysis_msmc2/out
+Simulation_Studies/analysis_relate/out
+Simulation_Studies/analysis_CHIMP/out
+Simulation_Studies/plotting_tools/out/Fplots
+Simulation_Studies/plotting_tools/out/truth_trajectories
+
+# also some binaries for relate
+Simulation_Studies/analysis_relate/jobs_handler/py_scripts/binaries
+
+# output from real data analysis
+1000G_analysis/analysis_CHIMP/out
+
+# and some temporal files from the real data analysis
+1000G_analysis/analysis_CHIMP/jobs_handler/*.vcf
+
+1000G_analysis/analysis_CHIMP/jobs_handler/igsr-1000 genomes 30x on grch38.tsv
+1000G_analysis/plotting_tools/out/1000G_l-5.pdf

@@ -144,7 +144,34 @@ if __name__=="__main__":
         except FileNotFoundError:
             print(f"!!! DID NOT FIND FILE !!!")
             continue
-        
+
+        # see if finished properly, otherwise raise alarm
+        try:
+            outFilename = f"{folder}/{prefix}{i+1}/{prefix}{i+1}.out"
+            ifs =  open (outFilename, "r")
+            properFinish = False
+            exitCode = None
+            for line in ifs:
+                fields = line.strip().split(":")
+                if(fields[0].startswith('Exit Code')):
+                    exitCode = int(fields[1])
+                    if (exitCode != 0):
+                        break
+                    else:
+                        properFinish = True
+            if (not properFinish): 
+                    print (f"!!! RUN DID NOT FINISH (YET) !!!")
+                    print (outFilename)
+                    if (exitCode is None):
+                        print ("!!! NO EXIT CODE GIVEN !!!")
+                    else:
+                        print (f"!!! EXIT CODE: {exitCode} !!!")
+                    continue
+        except FileNotFoundError:
+            print(f"!!! NO OUTPUT FILE FROM CLUSTER !!!")
+            continue
+
+
         y_head = ''
     
         # isolate the headers, find column with y vals
