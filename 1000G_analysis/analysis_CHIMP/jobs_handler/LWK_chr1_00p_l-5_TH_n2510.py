@@ -8,6 +8,25 @@ from pathlib import Path
 
 lambdaPower = -5
 
+# make sure refernce and ancestral sequence are in place
+refFileChr1 = "../../../../../../grch38_fastas/GRCh38_reference/chr1.ref"
+ancFileChr1 = "../../../../../../grch38_fastas/GRCh38_ancestral/homo_sapiens_ancestor_GRCh38/homo_sapiens_ancestor_1.fa"
+
+# check if files are there
+if (Path(refFileChr1).is_file()):
+    print ("ref yes")
+else:
+    print ("Please download the reference sequence for Chr 1 (GRCh38) from " \
+            + "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/ " \
+            + "and make sure that the path in the script points to the correct file.")
+if (Path(ancFileChr1).is_file()):
+    print ("anc yes")
+else:
+    print ("Please download the fasta with the ancestral alleles for Chr 1 (GRCh38) from " \
+            + "ftp://ftp.ensembl.org/pub/release-104/fasta/ancestral_alleles/ " \
+            + "and make sure that the path in the script points to the correct file.")
+
+
 # RUN WITHOUT ARGUMENTS THIS FILE PRINTS OUT SH FILES FOR THE JOBS
 if len(sys.argv) == 1:
     home_path = str(Path.home())
@@ -106,8 +125,8 @@ if len(sys.argv) > 1:
     ## deal with files
     CHIMP_command = CHIMP_command + f" --data_dir={data_folder} "
     CHIMP_command = CHIMP_command + f" --vcf_list={input_vcf}.vcf "
-    CHIMP_command = CHIMP_command + " --ref_list=../../../../../../grch38_fastas/GRCh38_reference/chr1.ref "
-    CHIMP_command = CHIMP_command + " --anc_list=../../../../../../grch38_fastas/GRCh38_ancestral/homo_sapiens_ancestor_GRCh38/homo_sapiens_ancestor_1.fa "
+    CHIMP_command = CHIMP_command + f" --ref_list={refFileChr1} "
+    CHIMP_command = CHIMP_command + f" --anc_list={ancFileChr1} "
     CHIMP_command = CHIMP_command + " --chr_l=248956422 "
     CHIMP_command = CHIMP_command + f" --out_file={output_dir}{popsize_out_base} "
 

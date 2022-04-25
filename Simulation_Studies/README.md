@@ -1,3 +1,5 @@
+# Simulation study
+
 The code in this folder is used in producing the plots presented in the CHIMP paper.
 The general sequence to follow in reproducing these plots is as follows. 
 
@@ -24,17 +26,6 @@ Then in the analysis_[method]/job_handlers/ directory, each python script will n
 ### PLOTTING DATA:
 
 In order to plot data once all the analyses have been run:
-
-
-
-
-TRY TO MAKE IT SUCH THAT THIS STEP IS NOT NECESSARY:
-
-First the appropriate [demography]_truth.csv files should be moved to plotting_tools/out/truth_trajectories/\* . These were created when data was simulated, and will be used to show the "true" demography in plots when comparing the results of inference. 
-
-
-
-
 
 Then the plotting_tools/out/script_cons_[method].sh scripts need to be run. These will create consolidated results files by consolidating the results from across the 16 replicates for each of the individual analyses.
 
