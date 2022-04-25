@@ -1,19 +1,21 @@
-Analysis of real data
+# Analysis of the 1000 Genomes Data
+
+This directory contains scripts to analyze Chromosome 1 of the `LWK`, the `JPT`, and the `FIN` populations from the 1000 Genomes dataset.
 
 ### ANALYZING DATA:
 
-First the Chimp.jar file and appropriate binaries for Relate will need to be downloaded and placed in the appropriate directories ("analysis_CHIMP/job_handlers/CHIMP/\*" and "analysis_relate/job_handlers/py_scripts/binaries/\*"). Msmc2 will need to be installed and accessible from command line. 
+First the Chimp.jar file needs to be downloaded and placed in the appropriate directory "analysis_CHIMP/job_handlers/CHIMP/\*"
 
-Then in the analysis_[method]/job_handlers/ directory, each python script will need to be run. The python scripts are names in the format [demography_type]\_[#parameters for inference]\_[#samples analyzed] with some additional modifiers. Each of these scripts writes 16 .sh files each of which will run 1 analysis of 1 dataset. It then submits these through torque, and deletes the job files. The output is written to the analysis_[method]/out directories.
+Then in the analysis_CHIMP/job_handlers/ directory, the  python script `prepare1000Gdata.py` needs to be run. This produces commands to download the vcf files and for preprocessing it into unphased vcfs ready to be analyzed. Then, the python scripts 
+- `FIN_chr1_00p_l-5_TH_n2510.py`
+- `JPT_chr1_00p_l-5_TH_n2510.py`
+- `LWK_chr1_00p_l-5_TH_n2510.py`
+need to be executed to analyze the respective data. Each script checks for the availability of the reference fasta for Chromosome 1 and a fasta file containing the ancestral alleles. If these files are not present, it prints instructions where to download them. The scripts then submit these jobs through torque, and deletes the job files. The output is written to the analysis_CHIMP/out directory.
 
 
 ### PLOTTING DATA:
 
-In order to plot data once all the analyses have been run:
-
-Then the plotting_tools/out/script_cons_[method].sh scripts need to be run. These will create consolidated results files by consolidating the results from across the 16 replicates for each of the individual analyses.
-
-Finally, running plot_script.py will create the plots using the consolidated data, and write them to the Fplots directory. 
+In order to plot the results, the script `plot1000G.py` in the directory `plotting_tools/out/` has to be executed. This produces the output file `1000G_l-5.pdf` displaying the inferred size histories for the threee population groups.
 
 
 

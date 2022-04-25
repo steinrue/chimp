@@ -6,19 +6,20 @@ The method can be run with the `Chimp.jar` file provided for download in this re
 
 The subdirectory `Simulation_Studies` contains `python` scripts that were used to conduct the simulation studies in the [manuscript](https://doi.org/10.1101/2021.05.22.445274).
 
+The subdirectory `1000G_analysis` contains `python` scripts that were used to analyze Chromosome 1 from the 1000 Genomes dataset for the `LWK`, `JPT`, and `FIN` populations, as described in the [manuscript](https://doi.org/10.1101/2021.05.22.445274).
 
 # Input and Output
 
 In order to run CHIMP, you need to make sure you have three things for your data:
--  .vcf files containing data for SNPs. Non-bialellic SNPs (e.g. tri-allellic, structural variation, ...) are filtered out by Chimp.
--  .fasta files for the reference sequence. This specifies the alleles at the sites that are not listed in the .vcf ('N' for missing sites).
--  .fasta files for the ancestral sequence. If you do not have this, the reference files can be used here, though the inference may be affected.
+- .vcf files containing data for SNPs. Non-bialellic SNPs (e.g. tri-allellic, structural variation, ...) are filtered out by Chimp.
+- .fasta files for the reference sequence. This specifies the alleles at the sites that are not listed in the .vcf ('N' for missing sites).
+- .fasta files for the ancestral sequence. If you do not have this, the reference files can be used here, though the inference may be affected.
 
 CHIMP will analyze the VCFs provided, selecting a specified number of haplotypes from left to right (it will treat diploid individual data as two separate haplotypes) and ignoring additional haplotypes if the file contains more than specified. If this method for selecting the haplotypes might cause bias for your data, we recommend reordering (e.g. randomly permuting) the haplotypes before running CHIMP. 
 
 Any variant listed in the VCF that is not a biallelic SNP for the samples to be analyzed (e.g. tri-allellic, structural variation, ...) will be treated as a missing site, and positions not listed in the VCF are treated as non-segregating. The reference FASTA file is used to specify tracts of missing data, and the ancestral FASTA file helps distinguish ancestral from derived alleles. 
 
-CHIMP will infer a piece-wise constant population size history with 20 epochs. The boundaries between these epochs are distributed exponentially (uniformly on a log scale) between Ne/50 and 5*Ne. Ne is the effective population size computed from Waterson's Estimator across the data, and is also the value at which the population size in each epoch is initialized.
+CHIMP will infer a piece-wise constant population size history with 20 epochs. The boundaries between these epochs are distributed exponentially (uniformly on a log scale) between Ne/50 and 20*Ne. Ne is the effective population size computed from Waterson's Estimator across the data, and is also the value at which the population size in each epoch is initialized.
 
 Upon completion, CHIMP will output two files. The PARAM file contains the results of the inference, listed as a single ordered pair for each epoch of the history. Each ordered pair contains [epoch's lower bound in generations, population size during epoch]. All times are given in generations before present, and population sizes are given in number of diploid individuals. The CSV file contains a dense set of ordered pairs (with many pairs for each epoch) that can be used for plotting. 
 
@@ -33,15 +34,15 @@ When running CHIMP, the following options are necessary.By default, CHIMP will u
 --mut_rate <mutation_rate>
         Mutation rate along a lineage, specified per generation per nucleotide
         (e.g. .0000000125 for human data).
-        
---base_n <base_n_samples>
-        Number of haplotypes considered in each parallel CHMM model (The total
-        number of haplotypes analyzed is <base_n> * <n_groups> under our
-        composite likelihood scheme, default for <n_groups> is 1). We
-        recommend at most choosing --base_n=10 (though for TMRCA the method is
-        still tractable up to 30) and adjusting <n_groups> accordingly to tackle
-        larger sample sizes.
-        
+
+--base_n base_n_samples1,base_n_samples2,...,base_n_samplesN
+        List of n_s values. CHIMP will analyze all the samples in the vcf as
+        non-overlapping subgroups of n_s samples for all n_s values. These
+        parallel CHMM runs are aggregated in the composite likelihood framework.
+        We recommend using an n_s value of 10 at most (though for TMRCA, the
+        method is still tractable up to 30). To analyze a subset of all the
+        samples, use either <n_groups> or <hap_groups>.
+
 --vcf_list [vcf_1,vcf_2,...,vcf_N]
 	List of VCF files for each chromosome to perform inference on. Will
         analyze the first (<base_n> * <n_groups>, default for <n_groups> is
@@ -79,10 +80,18 @@ Further customization of the model and the inference procedure can be achieved w
 
 
 ```
---n_groups <sub_sample_groups>
-        Number of subordinate CHMMs (each considering <base_n> haplotypes)
-        analyzed in composite analysis. Total number of haplotypes analyzed is 
-        <base_n> * <n_groups>. (default: 1)
+--n_groups sub_sample_groups1,sub_sample_groups2,...,sub_sample_groupsN
+        A list of number of groups that correspond to the n_s values in
+        <base_n>. For the i'th entry of [base_n], <n_groups>[i] non-overlapping
+        groups of samples will be included in the analysis, indexed in the order
+        they appear in the VCF.
+
+--hap_groups <subgroup_file>
+        Use this file to specify the exact haplotype subgroups used in the
+        composite likelihood framework. Each row contains a comma-seperated list
+        of haplotype indices (positive integers, in order following VCF, index
+        starts at 1). Both <base_n> and <n_groups> get overwritten if this is
+        specified.
         
 --t_bounds [min_time,max_time]
         This is used to specify epochs for population size history. The epoch
@@ -153,6 +162,19 @@ Further customization of the model and the inference procedure can be achieved w
 	      will assume each allele for each variant in the VCF is randomly selected 
 	      from either haploid of a diploid individual (independently for each 
 	      variant/individual). Emission probabilities will be adjusted accordingly.
+	      
+--reg_lambdas regularizing_parameters1,regularizing_parameters2,...,regularizing_parametersN 
+        Regularizing coefficients used in likelihood optimization. Coefficients
+        of [d0l2, d1l1, d1l2, d2l2] respectively. These coefficients are
+        multiplied by [d0l2,d1l1,d1l2,d2l2] respectively and are subtracted from
+        the objective function. d0l2 corresponds to the squared deviation from a
+        constant population (Waterson’s estimate). d1l1 corresponds to the
+        absolute value difference of the population size change between adjacent
+        epochs, while d1l2 corresponds to the squared difference of the same.
+        d2l2 is an analog for the square of the second derivative (computed for
+        discrete epochs instead), and upweighting it will penalize deviations
+        from linear behavior. The default is no regularization. (default:
+        0,0,0,0)
 	
 ```
 
@@ -205,6 +227,10 @@ The following options may be used.
         the last corresponds to the largest. [partitions] should sum to 1. This
         option overrides n_states.
 
+--partition_vals partition_vals1,partition_vals2,...,partition_valsN 
+        List of the partitions for states of the CHMM (in generations).This
+        option overrides n_states. Should be increasing positive values.
+
 --ps_scale <population_rescale_factor>
         Internal Population Rescale Factor. Modify this if ODE stepsize error
         thrown. (default: 1000)
@@ -247,19 +273,6 @@ The following options may be used.
 The following options have not been extensively tested and we recommend caution when using them.
 
 ```
---reg_lambdas [regularization1,regularization2,regularization3,regularization4]
-        Regularizing coefficients used in likelihood optimization. Coefficients
-        of [d0l2, d1l1, d1l2, d2l2] respectively. These coefficients are
-        multiplied by [d0l2,d1l1,d1l2,d2l2] respectively and are subtracted from
-        the objective function. d0l2 corresponds to the squared deviation from a
-        constant population (Waterson?s estimate). d1l1 corresponds to the
-        absolute value difference of the population size change between adjacent
-        epochs, while d1l2 corresponds to the squared difference of the same.
-        d2l2 is an analog for the square of the second derivative (computed for
-        discrete epochs instead), and upweighting it will penalize deviations
-        from linear behavior. The default is no regularization. (default:
-        0,0,0,0)
-        
 --spline
         This option is not fully tested. It specifies that the population size
         history will be modeled by a cubic spline function (instead of
