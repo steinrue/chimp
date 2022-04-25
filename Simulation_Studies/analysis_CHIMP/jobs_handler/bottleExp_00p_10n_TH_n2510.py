@@ -11,7 +11,7 @@ if len(sys.argv) == 1:
     home_path = str(Path.home())
     
     datadir = f"../data/bottleExp/"
-    prefix = "00p_10n_TH_"
+    prefix = "00p_10n_TH_n2510_"
     dataset = "bottleExp_dataset"
 
 
@@ -33,7 +33,7 @@ if len(sys.argv) == 1:
         i_file = open("job"+str(i+1)+".sh","w+" )
 
         i_file.write( "#!/bin/bash" + "\n" )
-        i_file.write( "#PBS -N CHIMP_job_"+str(i+1) + "\n" )
+        i_file.write( "#PBS -N CHIMP_job_"+str(i+1)+"_"+prefix + "\n" )
         i_file.write( "#PBS -S /bin/bash" + "\n" )
         i_file.write( "#PBS -l walltime=20:00:00" + "\n" )
         i_file.write( "#PBS -l nodes=1:ppn=1" + "\n" )
@@ -74,8 +74,8 @@ if len(sys.argv) > 1:
     ## demography specifications/basic model parameters
     CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=5,2,1 "
 
     #CHIMP_command = CHIMP_command + " --t_bounds='200,20000' "
     #CHIMP_command = CHIMP_command + " --dof=18 "

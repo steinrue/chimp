@@ -10,9 +10,9 @@ from pathlib import Path
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"../data/sawSPS/"
-    prefix = "20p_10n_TL_"
-    dataset = "sawSPS_dataset"
+    datadir = f"../data/bottleExp/"
+    prefix = "20p_200n_TH_n2510_"
+    dataset = "bottleExp_dataset"
 
 
 
@@ -74,17 +74,17 @@ if len(sys.argv) > 1:
     ## demography specifications/basic model parameters
     CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=100,40,20 "
 
-    CHIMP_command = CHIMP_command + " --t_bounds='40,40000' "
+    CHIMP_command = CHIMP_command + " --t_bounds='200,20000' "
     CHIMP_command = CHIMP_command + " --dof=18 "
     #CHIMP_command = CHIMP_command + " --spline "
 
     
     ## tree length options
-    CHIMP_command = CHIMP_command + " --tree_length "
-    # CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
+    #CHIMP_command = CHIMP_command + " --tree_length "
+    #CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
 
     ## EM options
     #CHIMP_command = CHIMP_command + " --em_cap=50 "

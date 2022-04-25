@@ -10,9 +10,9 @@ from pathlib import Path
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"../data/sawSPS/"
-    prefix = "20p_10n_TL_"
-    dataset = "sawSPS_dataset"
+    datadir = f"../data/sawSPS_RM/"
+    prefix = "20p_200n_TH_n2510_"
+    dataset = "sawSPS_RM_dataset"
 
 
 
@@ -72,10 +72,10 @@ if len(sys.argv) > 1:
     #########################
     
     ## demography specifications/basic model parameters
-    CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
+    CHIMP_command = CHIMP_command + " --rec_rate=.00000001129 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=100,40,20 "
 
     CHIMP_command = CHIMP_command + " --t_bounds='40,40000' "
     CHIMP_command = CHIMP_command + " --dof=18 "
@@ -83,8 +83,8 @@ if len(sys.argv) > 1:
 
     
     ## tree length options
-    CHIMP_command = CHIMP_command + " --tree_length "
-    # CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
+    #CHIMP_command = CHIMP_command + " --tree_length "
+    #CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
 
     ## EM options
     #CHIMP_command = CHIMP_command + " --em_cap=50 "
@@ -104,7 +104,7 @@ if len(sys.argv) > 1:
     CHIMP_command = CHIMP_command + f" --vcf_list={input_vcf}.vcf "
     CHIMP_command = CHIMP_command + " --ref_list=../sim_ref.fasta "
     CHIMP_command = CHIMP_command + " --anc_list=../sim_anc.fasta "
-    CHIMP_command = CHIMP_command + " --chr_l=200000000 "
+    CHIMP_command = CHIMP_command + " --chr_l=197874528 "
     CHIMP_command = CHIMP_command + f" --out_file={output_dir}{popsize_out_base} "
 
     #CHIMP_command = CHIMP_command + " --print_all "

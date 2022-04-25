@@ -6,13 +6,15 @@ import os
 import sys
 from pathlib import Path
 
+lambdaPower = -7
+
 # RUN WITHOUT ARGUMENTS THIS FILE PRINTS OUT SH FILES FOR THE JOBS
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"../data/sawSPS_RM/"
-    prefix = "20p_10n_TH_"
-    dataset = "sawSPS_RM_dataset"
+    datadir = f"../data/bottleExp/"
+    prefix = f"20p_10n_TH_n2510_l{lambdaPower}_"
+    dataset = "bottleExp_dataset"
 
 
 
@@ -33,7 +35,7 @@ if len(sys.argv) == 1:
         i_file = open("job"+str(i+1)+".sh","w+" )
 
         i_file.write( "#!/bin/bash" + "\n" )
-        i_file.write( "#PBS -N CHIMP_job_"+str(i+1) + "\n" )
+        i_file.write( "#PBS -N CHIMP_job_"+str(i+1)+"_"+prefix + "\n" )
         i_file.write( "#PBS -S /bin/bash" + "\n" )
         i_file.write( "#PBS -l walltime=20:00:00" + "\n" )
         i_file.write( "#PBS -l nodes=1:ppn=1" + "\n" )
@@ -72,12 +74,12 @@ if len(sys.argv) > 1:
     #########################
     
     ## demography specifications/basic model parameters
-    CHIMP_command = CHIMP_command + " --rec_rate=.00000001129 "
+    CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=5,2,1 "
 
-    CHIMP_command = CHIMP_command + " --t_bounds='40,40000' "
+    CHIMP_command = CHIMP_command + " --t_bounds='200,20000' "
     CHIMP_command = CHIMP_command + " --dof=18 "
     #CHIMP_command = CHIMP_command + " --spline "
 
@@ -95,7 +97,7 @@ if len(sys.argv) > 1:
 
 
     #CHIMP_command = CHIMP_command + " --metalocus=500 "
-    #CHIMP_command = CHIMP_command + " --reg_lambdas='0,0,0,0' "
+    CHIMP_command = CHIMP_command + f" --reg_lambdas='0,0,{numpy.power(10.,lambdaPower)},0' "
     #CHIMP_command = CHIMP_command + " --ps_scale=1000 "
 
 
@@ -104,7 +106,7 @@ if len(sys.argv) > 1:
     CHIMP_command = CHIMP_command + f" --vcf_list={input_vcf}.vcf "
     CHIMP_command = CHIMP_command + " --ref_list=../sim_ref.fasta "
     CHIMP_command = CHIMP_command + " --anc_list=../sim_anc.fasta "
-    CHIMP_command = CHIMP_command + " --chr_l=197874528 "
+    CHIMP_command = CHIMP_command + " --chr_l=200000000 "
     CHIMP_command = CHIMP_command + f" --out_file={output_dir}{popsize_out_base} "
 
     #CHIMP_command = CHIMP_command + " --print_all "

@@ -10,10 +10,9 @@ from pathlib import Path
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"../data/sawSPS/"
-    prefix = "20p_10n_TL_"
-    dataset = "sawSPS_dataset"
-
+    datadir = f"../data/bottle/"
+    prefix = "3p_10n_TH_n2510_"
+    dataset = "bottle_dataset"
 
 
     # make sure you create output directory to place all outfiles
@@ -29,13 +28,12 @@ if len(sys.argv) == 1:
         process = subprocess.Popen("mkdir "+ outDir, stderr=subprocess.PIPE, shell=True)
         process.communicate()
 
-
         i_file = open("job"+str(i+1)+".sh","w+" )
 
         i_file.write( "#!/bin/bash" + "\n" )
         i_file.write( "#PBS -N CHIMP_job_"+str(i+1)+"_"+prefix + "\n" )
         i_file.write( "#PBS -S /bin/bash" + "\n" )
-        i_file.write( "#PBS -l walltime=60:00:00" + "\n" )
+        i_file.write( "#PBS -l walltime=12:00:00" + "\n" )
         i_file.write( "#PBS -l nodes=1:ppn=1" + "\n" )
         i_file.write( "#PBS -l mem=16gb" + "\n" )
         i_file.write( f"#PBS -o ../{outDir}/{datafile}.out" + "\n" )
@@ -74,17 +72,17 @@ if len(sys.argv) > 1:
     ## demography specifications/basic model parameters
     CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=5,2,1 "
 
-    CHIMP_command = CHIMP_command + " --t_bounds='40,40000' "
-    CHIMP_command = CHIMP_command + " --dof=18 "
+    CHIMP_command = CHIMP_command + " --t_bounds='1000,2000' "
+    CHIMP_command = CHIMP_command + " --dof=1 "
     #CHIMP_command = CHIMP_command + " --spline "
 
     
     ## tree length options
-    CHIMP_command = CHIMP_command + " --tree_length "
-    # CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
+    #CHIMP_command = CHIMP_command + " --tree_length "
+    #CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
 
     ## EM options
     #CHIMP_command = CHIMP_command + " --em_cap=50 "

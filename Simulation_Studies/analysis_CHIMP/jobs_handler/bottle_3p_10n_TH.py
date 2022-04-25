@@ -31,7 +31,7 @@ if len(sys.argv) == 1:
         i_file = open("job"+str(i+1)+".sh","w+" )
 
         i_file.write( "#!/bin/bash" + "\n" )
-        i_file.write( "#PBS -N CHIMP_job_"+str(i+1) + "\n" )
+        i_file.write( "#PBS -N CHIMP_job_"+str(i+1)+"_"+prefix + "\n" )
         i_file.write( "#PBS -S /bin/bash" + "\n" )
         i_file.write( "#PBS -l walltime=12:00:00" + "\n" )
         i_file.write( "#PBS -l nodes=1:ppn=1" + "\n" )

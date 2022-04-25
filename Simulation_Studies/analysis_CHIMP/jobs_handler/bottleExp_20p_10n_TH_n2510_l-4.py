@@ -6,13 +6,15 @@ import os
 import sys
 from pathlib import Path
 
+lambdaPower = -4
+
 # RUN WITHOUT ARGUMENTS THIS FILE PRINTS OUT SH FILES FOR THE JOBS
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"../data/pwcsawX_pseudo/"
-    prefix = "15p_10n_PH_"
-    dataset = "pwcsawX_pseudo_dataset"
+    datadir = f"../data/bottleExp/"
+    prefix = f"20p_10n_TH_n2510_l{lambdaPower}_"
+    dataset = "bottleExp_dataset"
 
 
 
@@ -33,9 +35,9 @@ if len(sys.argv) == 1:
         i_file = open("job"+str(i+1)+".sh","w+" )
 
         i_file.write( "#!/bin/bash" + "\n" )
-        i_file.write( "#PBS -N CHIMP_job_"+str(i+1) + "\n" )
+        i_file.write( "#PBS -N CHIMP_job_"+str(i+1)+"_"+prefix + "\n" )
         i_file.write( "#PBS -S /bin/bash" + "\n" )
-        i_file.write( "#PBS -l walltime=12:00:00" + "\n" )
+        i_file.write( "#PBS -l walltime=20:00:00" + "\n" )
         i_file.write( "#PBS -l nodes=1:ppn=1" + "\n" )
         i_file.write( "#PBS -l mem=16gb" + "\n" )
         i_file.write( f"#PBS -o ../{outDir}/{datafile}.out" + "\n" )
@@ -74,15 +76,29 @@ if len(sys.argv) > 1:
     ## demography specifications/basic model parameters
     CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=5,2,1 "
 
-    CHIMP_command = CHIMP_command + " --t_bounds='56.501, 448806.0' "
-    CHIMP_command = CHIMP_command + " --dof=13 "
-
-    CHIMP_command = CHIMP_command + " --pseudo "
+    CHIMP_command = CHIMP_command + " --t_bounds='200,20000' "
+    CHIMP_command = CHIMP_command + " --dof=18 "
+    #CHIMP_command = CHIMP_command + " --spline "
 
     
+    ## tree length options
+    #CHIMP_command = CHIMP_command + " --tree_length "
+    #CHIMP_command = CHIMP_command + " --pde_res='1000,250' "
+
+    ## EM options
+    #CHIMP_command = CHIMP_command + " --em_cap=50 "
+    #CHIMP_command = CHIMP_command + " --s_type=0 "
+    #CHIMP_command = CHIMP_command + " --simplex_scale=.1 "
+    #CHIMP_command = CHIMP_command + " --ll_converge=.02 "
+    #CHIMP_command = CHIMP_command + " --m_evals=35 "
+
+
+    #CHIMP_command = CHIMP_command + " --metalocus=500 "
+    CHIMP_command = CHIMP_command + f" --reg_lambdas='0,0,{numpy.power(10.,lambdaPower)},0' "
+    #CHIMP_command = CHIMP_command + " --ps_scale=1000 "
 
 
     ## deal with files

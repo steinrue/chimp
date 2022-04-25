@@ -10,9 +10,9 @@ from pathlib import Path
 if len(sys.argv) == 1:
     home_path = str(Path.home())
     
-    datadir = f"../data/sawSPS/"
-    prefix = "20p_10n_TL_"
-    dataset = "sawSPS_dataset"
+    datadir = f"../data/pwcsawX/"
+    prefix = "15p_10n_TL_n2_o_"
+    dataset = "pwcsawX_dataset"
 
 
 
@@ -74,11 +74,13 @@ if len(sys.argv) > 1:
     ## demography specifications/basic model parameters
     CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    # CHIMP_command = CHIMP_command + " --base_n=5 "
+    # CHIMP_command = CHIMP_command + " --n_groups=2 "
+    CHIMP_command = CHIMP_command + " --hap_groups jobs_handler/n2_all_pairs.txt "
 
-    CHIMP_command = CHIMP_command + " --t_bounds='40,40000' "
-    CHIMP_command = CHIMP_command + " --dof=18 "
+
+    CHIMP_command = CHIMP_command + " --t_bounds='56.501, 448806.0' "
+    CHIMP_command = CHIMP_command + " --dof=13 "
     #CHIMP_command = CHIMP_command + " --spline "
 
     

@@ -11,7 +11,7 @@ if len(sys.argv) == 1:
     home_path = str(Path.home())
     
     datadir = f"../data/pwcsawX_pseudo/"
-    prefix = "15p_10n_Reg_"
+    prefix = "15p_10n_TH_n2510_PH_"
     dataset = "pwcsawX_pseudo_dataset"
 
 
@@ -33,9 +33,9 @@ if len(sys.argv) == 1:
         i_file = open("job"+str(i+1)+".sh","w+" )
 
         i_file.write( "#!/bin/bash" + "\n" )
-        i_file.write( "#PBS -N CHIMP_job_"+str(i+1) + "\n" )
+        i_file.write( "#PBS -N CHIMP_job_"+str(i+1)+"_"+prefix + "\n" )
         i_file.write( "#PBS -S /bin/bash" + "\n" )
-        i_file.write( "#PBS -l walltime=12:00:00" + "\n" )
+        i_file.write( "#PBS -l walltime=16:00:00" + "\n" )
         i_file.write( "#PBS -l nodes=1:ppn=1" + "\n" )
         i_file.write( "#PBS -l mem=16gb" + "\n" )
         i_file.write( f"#PBS -o ../{outDir}/{datafile}.out" + "\n" )
@@ -74,12 +74,13 @@ if len(sys.argv) > 1:
     ## demography specifications/basic model parameters
     CHIMP_command = CHIMP_command + " --rec_rate=.0000000125 "
     CHIMP_command = CHIMP_command + " --mut_rate=.0000000125 "
-    CHIMP_command = CHIMP_command + " --base_n=10 "
-    CHIMP_command = CHIMP_command + " --n_groups=1 "
+    CHIMP_command = CHIMP_command + " --base_n=2,5,10 "
+    CHIMP_command = CHIMP_command + " --n_groups=5,2,1 "
 
     CHIMP_command = CHIMP_command + " --t_bounds='56.501, 448806.0' "
     CHIMP_command = CHIMP_command + " --dof=13 "
 
+    CHIMP_command = CHIMP_command + " --pseudo "
 
     
 
