@@ -10,10 +10,11 @@ The subdirectory `1000G_analysis` contains `python` scripts that were used to an
 
 # Input and Output
 
-In order to run CHIMP, you need to make sure you have three things for your data:
+In order to run CHIMP, you need to make sure you need the following things for your data:
 - .vcf files containing data for SNPs. Non-bialellic SNPs (e.g. tri-allellic, structural variation, ...) are filtered out by Chimp.
 - .fasta files for the reference sequence. This specifies the alleles at the sites that are not listed in the .vcf ('N' for missing sites).
 - .fasta files for the ancestral sequence. If you do not have this, the reference files can be used here, though the inference may be affected.
+- Estimate of genome-wide per site per generation mutation and recombination rate.
 
 CHIMP will analyze the VCFs provided, selecting a specified number of haplotypes from left to right (it will treat diploid individual data as two separate haplotypes) and ignoring additional haplotypes if the file contains more than specified. If this method for selecting the haplotypes might cause bias for your data, we recommend reordering (e.g. randomly permuting) the haplotypes before running CHIMP. 
 
