@@ -389,12 +389,14 @@ truth_file = f"./truth_trajectories/{dem_type}_truth.csv"
 
 trajectories = dict()
 
+trajectories[r"CHIMP-$\mathcal{T}_{2,10}$"]= f"../../analysis_CHIMP/out/15p_10n_TH_n210_no_{dem_type}_dataset/{dem_type}_dataset_CONSOLIDATED.csv"
 trajectories[r"CHIMP-$\mathcal{T}_{2,5,10}$"]= f"../../analysis_CHIMP/out/15p_10n_TH_n2510_no_{dem_type}_dataset/{dem_type}_dataset_CONSOLIDATED.csv"
+trajectories[r"CHIMP-$\mathcal{L}_{2,10}$"]= f"../../analysis_CHIMP/out/15p_10n_TL_n210_no_{dem_type}_dataset/{dem_type}_dataset_CONSOLIDATED.csv"
 trajectories[r"CHIMP-$\mathcal{L}_{2,5,10}$"]= f"../../analysis_CHIMP/out/15p_10n_TL_n2510_no_{dem_type}_dataset/{dem_type}_dataset_CONSOLIDATED.csv"
 trajectories["MSMC2"]= f"../../analysis_msmc2/out/15p_10n_{dem_type}_dataset/{dem_type}_dataset_CONSOLIDATED.csv"
 
 
-plotting_method(write_file,f"./truth_trajectories/{dem_type}_truth.csv", trajectories, [20,2500000],[1000,1000000],  [28,895484.],colors=['blue', 'red', 'orange'])
+plotting_method(write_file,f"./truth_trajectories/{dem_type}_truth.csv", trajectories, [20,2500000],[1000,1000000],  [28,895484.])
 
 
 ######################

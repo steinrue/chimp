@@ -109,10 +109,15 @@ python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TL_n5_no_pwcsawX
 
 
 # PWCSAWX -- multiple n
-python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TH_n2510_no_pwcsawX_dataset pwcsawX_dataset 16 True
+# this one was already run before
+# python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TH_n2510_no_pwcsawX_dataset pwcsawX_dataset 16 True
 
-python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TL_n2510_no_pwcsawX_dataset pwcsawX_dataset 16 True
+# this one was already run before
+# python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TL_n2510_no_pwcsawX_dataset pwcsawX_dataset 16 True
 
+python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TH_n210_no_pwcsawX_dataset pwcsawX_dataset 16 True
+
+python3 consolidate_results.py ../../analysis_CHIMP/out/15p_10n_TL_n210_no_pwcsawX_dataset pwcsawX_dataset 16 True
 
 
 # BOTTLE+EXP regularization
