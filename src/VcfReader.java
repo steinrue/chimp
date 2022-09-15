@@ -89,7 +89,7 @@ public class VcfReader {
 	///////////////////////
 	// PRIMARY METHODS ////
 	
-	private int[][] getReducedStream(){
+	private int[][] getReducedStream() throws FileNotFoundException{
 		double stime = System.nanoTime(); // just to time this method
 		
 		// setup holder arraylists
@@ -113,8 +113,12 @@ public class VcfReader {
 		
 		//****IMPLEMENT SOMETHING TO ENSURE THE SEG SITES ARE IN CORRECT ORDER
 		
-		
 	
+		// give a nice error message if the file does not exist
+		if (!target_vcf_file.exists() || !target_vcf_file.canRead()) {
+			throw new FileNotFoundException(target_vcf_file.getPath() + " (No such file or directory, or insufficient permissions)");
+		}
+		
 		// get the variant-reading iterator setup
 		VCFFileReader r_vcf = new VCFFileReader(target_vcf_file, false);
 		CloseableIterator<VariantContext> vcf_iter = r_vcf.iterator();
@@ -452,7 +456,7 @@ public class VcfReader {
 	/////////////////////////////////////
 	// return reduced stream if mL_size=1 otherwise convert to mL stream
 	
-	int[][] getStream(int mL_size){
+	int[][] getStream(int mL_size) throws FileNotFoundException{
 	
 		// if mL size is 1, just return regular locus skipping reducedStream
 		int[][] rS = this.getReducedStream();	
@@ -769,7 +773,10 @@ public class VcfReader {
 								else {	is_multiallelic = true; missing_haps = -1; der_haps = -1; types_of_alleles = 3;}
 							}
 							// do nothing, already set appropriate markers ^
-							else {}
+							else {
+								// should never go here
+								assert(false);
+							}
 							
 						}
 						num_processed_haps++; // counter for number of haps we processed
@@ -779,7 +786,7 @@ public class VcfReader {
 			}
 			
 			//check to make sure that we processed all num_samples haplotypes
-			if(num_processed_haps != num_samples) { System.out.print("Specified hap is out of range of VCF, or index used multiple times in one group."); System.exit(0);}
+			if(num_processed_haps != num_samples) { System.out.print("Specified hap is out of range of VCF, or index used multiple times in one group. Try adjusting the haplotype grouping."); System.exit(0);}
 			
 			// tag certain properties based on read info
 			if (missing_haps > 0 ) {part_missing = true;}

@@ -905,7 +905,7 @@ public class Helper {
 		
 		private int[][] haps_indices;
 		
-		dataStreamsHandler(ArrayList<String> file_names, ArrayList<String> reference_names, ArrayList<String> ancestral_names,  ArrayList<Integer> ls, ArrayList<int[]> hap_index_lists, int max_tract_size, int mL_size, boolean binary_emission, String temp_prefix){
+		dataStreamsHandler(ArrayList<String> file_names, ArrayList<String> reference_names, ArrayList<String> ancestral_names,  ArrayList<Integer> ls, ArrayList<int[]> hap_index_lists, int max_tract_size, int mL_size, boolean binary_emission, String temp_prefix) throws FileNotFoundException{
 			// filenames, ref_names, anc_names, ls, sample_intervals, 
 			// each are array of equal length, and define the corresponding field for a datastream that we use for analysis
 			

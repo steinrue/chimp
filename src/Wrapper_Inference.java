@@ -874,6 +874,7 @@ public class Wrapper_Inference {
 		// but should only get usage for the visible parameters
 		SimpleJSAP visibleJsap = new SimpleJSAP ("Demographic Inference Method \n", help_description, visibleParams);
 		fullJsap.setHelp (visibleJsap.getHelp());
+		fullJsap.setUsage(visibleJsap.getUsage());
 		
 		
 		// parse all parameters
